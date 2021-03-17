@@ -1,0 +1,50 @@
+https://github.com/OslanKetis/PFE_Datascientist_CEPE
+
+* Stat description
+* Modelisation --> Predictions
+* Application shiny
+
+Si l'application ne suffit pas faire un rmarkdown
+
+Sujets:
+--------------------------------
+https://www.kaggle.com/ahmedlahlou/accidents-in-france-from-2005-to-2016#
+jointure id accident et l'id de la voiture
+one hot coding
+travail en amont pour la visu
+* Data manipulation:
+  Transformation des long lat: https://www.fcc.gov/media/radio/dms-decimal
+A partir des codes communes et dep retrouver des positions plus précises.
+
+* Model/Predict:
+  Suivant la date et l'endroit,
+  	prédire la gravité d'un accident s'il survient
+    prédire la possibilité d'un accident
+Impact des éléments de sécurité sur la gravité de l'accident
+  Les accidents sur trajets professionnels sont ils plus dangereux que les autres et quels sont les critères aggravant  ?
+  Y a t'il des populations de personnes plus assujeti à des accidents grave ?
+  studying car accidents hotspot locations, casualty analysis 
+and extracting cause and effect rules to predict car accidents, 
+and studying the impact of precipitation or other environmental stimuli on accident occurrence
+
+* Data Viz:
+  Angle lat/long, visualisation de la sévérité des accidents suivant les conditions météo, timing journée
+Angle Département, visualiser les dep ayant le plus d'accident et leur impact sur les accidenté (grav)
+  
+  
+--------------------------------
+
+https://www.kaggle.com/kritikseth/us-airbnb-open-data/tasks?taskId=2542
+
+https://www.kaggle.com/theoverman/the-spotify-hit-predictor-dataset
+
+https://www.kaggle.com/paultimothymooney/phd-stipends/tasks?taskId=424
+
+http://archive.ics.uci.edu/ml/datasets/Gas+Turbine+CO+and+NOx+Emission+Data+Set#
+
+https://www.kaggle.com/brittabettendorf/berlin-airbnb-data
+
+
+http://archive.ics.uci.edu/ml/datasets/Taxi+Service+Trajectory+-+Prediction+Challenge%2C+ECML+PKDD+2015
+
+such as real-time car accident prediction, studying car accidents hotspot locations, casualty analysis and extracting cause and effect rules to predict car accidents, and studying the impact of precipitation or other environmental stimuli on accident occurrence
