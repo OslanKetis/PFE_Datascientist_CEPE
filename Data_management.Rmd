@@ -1,0 +1,69 @@
+---
+title: "Data_management"
+author: "Patrice, Stéphane, Fei"
+date: "23/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+title: "PFE"
+author: "Patrice, Stéphane, Fei"
+date: "23/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# importation des données
+```{r}
+caracteristiques.2019 <- read.csv2("New_Data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
+
+lieux.2019 <- read.csv2("New_Data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
+
+vehicules.2019 <- read.csv("New_Data/vehicules-2019.csv", sep=";")
+
+usagers.2019 <- read.csv("New_Data/usagers-2019.csv", sep=";")
+
+View(caracteristiques.2019)
+colnames(caracteristiques.2019)
+str(caracteristiques.2019)
+
+```
+
+# jointure des tables
+## il suffit d'utiliser inner join car les tables se correspondent
+
+```{r}
+library(tidyverse)
+acc_place_19 <- inner_join(caracteristiques.2019,lieux.2019,by=c("Num_Acc"="Num_Acc"));
+
+user_car_19<- inner_join(vehicules.2019,usagers.2019,by=c("Num_Acc"="Num_Acc", "id_vehicule" = "id_vehicule", "num_veh" = "num_veh"));
+
+total_19 <- inner_join(acc_place_19,user_car_19,by=c("Num_Acc"="Num_Acc"));
+
+```
+
+# Geolocalisation pour les accidents du département 59 en 2019. Trop consommant si on ne filter pas un seul departement
+
+```{r}
+caracteristiques.2019.59 <- caracteristiques.2019 %>% filter(grepl('^59',com))
+
+library(leaflet)
+m <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(lng=caracteristiques.2019.59$long, lat=caracteristiques.2019.59$lat , popup=caracteristiques.2019.59$adr)
+m  
+```
+
+# stat desc
+```{r}
+total_19 %>% summarise()
+
+```
+
