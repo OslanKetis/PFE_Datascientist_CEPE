@@ -22,13 +22,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # importation des données
 ```{r}
-caracteristiques.2019 <- read.csv2("New_Data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
+caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
 
-lieux.2019 <- read.csv2("New_Data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
+lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
 
-vehicules.2019 <- read.csv("New_Data/vehicules-2019.csv", sep=";")
+vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
 
-usagers.2019 <- read.csv("New_Data/usagers-2019.csv", sep=";")
+usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
 
 View(caracteristiques.2019)
 colnames(caracteristiques.2019)
