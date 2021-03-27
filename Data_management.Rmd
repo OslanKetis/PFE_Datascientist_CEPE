@@ -30,9 +30,34 @@ vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
 
 usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
 
+
 View(caracteristiques.2019)
 colnames(caracteristiques.2019)
 str(caracteristiques.2019)
+
+```
+
+# creation de variables de securite
+## secu_or_not : s'il y a au moins une équipement de securité
+## secu_level : nb d'équipements de sécurité
+```{r}
+usagers.2019 <- usagers.2019 %>% mutate(secu_or_not = (secu1 %in% c("1", "2","3","4","5", "6","7")) | (secu2 %in% c("1", "2","3","4","5", "6","7")) | (secu3 %in% c("1", "2","3","4","5", "6","7")), secu_level = (secu1 %in% c("1", "2","3","4","5", "6","7")) + (secu2 %in% c("1", "2","3","4","5", "6","7")) + (secu3 %in% c("1", "2","3","4","5", "6","7")))
+
+
+grav <- usagers.2019 %>% group_by(grav) %>% summarise(total=n())
+grav_secu <- 
+inner_join(usagers.2019 %>% filter(grav !=1) %>%  group_by(grav, secu_or_not) %>% summarise(n=n()), grav, by = "grav") %>% mutate(pourcentage = n/total) %>% mutate(lab_ypos = cumsum(n))
+lab_ypos_2 = c(3498, 1391, 20858, 6240, 53307, 12878)
+c <- cbind(grav_secu, lab_ypos_2)
+
+colnames(c) <- c("grav",        "secu_or_not", "n",           "total"   ,  
+"pourcentage", "lab_ypos",    "lab_ypos2") 
+
+
+library(ggplot2)
+ggplot(data = c, aes(x = grav, y = n)) +
+  geom_col(aes(fill = secu_or_not), width = 0.7)+
+  geom_text(aes(y = lab_ypos2/1.2, label = round(pourcentage, digits = 2), group =secu_or_not), color = "white")
 
 ```
 
@@ -64,6 +89,6 @@ m
 # stat desc
 ```{r}
 total_19 %>% summarise()
-
+colnames(total_19)
 ```
 
