@@ -9,7 +9,6 @@ library(shiny)
 library(shinyalert)
 library(shinydashboard)
 library(DT)
-library(tigris)
 library(leaflet)
 library(tidyverse)
 
