@@ -1,5 +1,6 @@
 library(httr)
 library(tidyverse)
+library(curl)
 
 getDepartement_by_long_lat <- function(long, lat){
   url <- paste("https://api-adresse.data.gouv.fr/reverse/?lon=",long, "&lat=",lat, sep = "")
@@ -19,7 +20,7 @@ getGeocodage <- function(file){
     h <- new_handle()
     handle_setform(h,
                    data=form_file("data/file2018.csv", "@/file2018.csv"))
-    handle_setopt(h, TIMEOUT = 120)
+    handle_setopt(h, TIMEOUT = 240)
     curl_download("https://api-adresse.data.gouv.fr/reverse/csv/",tmp, handle = h)
     readLines(tmp)
     

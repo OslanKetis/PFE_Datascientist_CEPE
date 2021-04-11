@@ -6,6 +6,8 @@ https://github.com/OslanKetis/PFE_Datascientist_CEPE
 
 Si l'application ne suffit pas faire un rmarkdown
 
+Mail de Frédéric : frederic.logemunerel@gmail.com
+
 Sujets:
 --------------------------------
 https://www.kaggle.com/ahmedlahlou/accidents-in-france-from-2005-to-2016#

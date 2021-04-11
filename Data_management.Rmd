@@ -1,5 +1,5 @@
 ---
-title: "Data_management"
+title: "PFE"
 author: "Patrice, Stéphane, Fei"
 date: "23/03/2021"
 output: html_document
@@ -9,12 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
----
-title: "PFE"
-author: "Patrice, Stéphane, Fei"
-date: "23/03/2021"
-output: html_document
----
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -87,6 +82,10 @@ m
 ```
 
 # stat desc
+```{r}
+total_19 %>% summarise()
+colnames(total_19)
+```
 ```{r}
 total_19 %>% summarise()
 colnames(total_19)
