@@ -101,6 +101,8 @@ caracteristiques.2017.filtre <- to_hrmn(caracteristiques.2017.filtre)
 caracteristiques.2018.filtre <- to_hrmn(caracteristiques.2018.filtre)
 
 ##dep####
+caracteristiques.2016.filtre$dep <- factor(caracteristiques.2016.filtre$dep)
+caracteristiques.2017.filtre$dep <- factor(caracteristiques.2017.filtre$dep)
 caracteristiques.2018.filtre$dep <- factor(caracteristiques.2018.filtre$dep)
 ##adr####
 caracteristiques.2016.filtre$adr <- as.character(caracteristiques.2016.filtre$adr)
@@ -111,7 +113,7 @@ caracteristiques.2019.filtre$adr <- as.character(caracteristiques.2019.filtre$ad
 caracteristiques.2019.filtre$com <- as.numeric(caracteristiques.2019.filtre$com)
 
 ##result####
-caracteristiques.filtre <- bind_rows(caracteristiques.2018.filtre, caracteristiques.2019.filtre)
+caracteristiques.filtre <- bind_rows(caracteristiques.2016.filtre, caracteristiques.2017.filtre, caracteristiques.2018.filtre, caracteristiques.2019.filtre)
 
 # Selection des données de l'année. A retravailler pour faire une sélection groupée / fusionnée.
 # caracteristiques.filtre <- caracteristiques.2016.filtre
@@ -137,7 +139,7 @@ server <- function(input, output, session) {
     
     # Selection du département à afficher sur la cart
     caracteristiques.select <- reactive({
-        caracteristiques.filtre %>% filter(dep == input$dep_fr_map)
+        caracteristiques.filtre %>% filter(an == input$annee_fr_map) %>% filter(dep == input$dep_fr_map)
     })
     
     output$fr_map <- renderLeaflet({

@@ -73,6 +73,7 @@ ui <- dashboardPage(
             ),
             
             tabItem(tabName = 'tab_map', class = "active",
+                    selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
                     selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
                     leafletOutput(outputId = "fr_map")
             )
