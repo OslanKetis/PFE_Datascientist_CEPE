@@ -101,11 +101,16 @@ caracteristiques.2017.filtre <- to_hrmn(caracteristiques.2017.filtre)
 caracteristiques.2018.filtre <- to_hrmn(caracteristiques.2018.filtre)
 
 ##dep####
+<<<<<<< HEAD
 # <<<<<<< HEAD
 # =======
 caracteristiques.2016.filtre$dep <- factor(caracteristiques.2016.filtre$dep)
 caracteristiques.2017.filtre$dep <- factor(caracteristiques.2017.filtre$dep)
 # >>>>>>> 86df7ff4264fc2f69f7b28818e2db8bd368963c4
+=======
+caracteristiques.2016.filtre$dep <- factor(caracteristiques.2016.filtre$dep)
+caracteristiques.2017.filtre$dep <- factor(caracteristiques.2017.filtre$dep)
+>>>>>>> f21e42bbec2ae6c9c8071a5ad868f19357adf09c
 caracteristiques.2018.filtre$dep <- factor(caracteristiques.2018.filtre$dep)
 ##adr####
 caracteristiques.2016.filtre$adr <- as.character(caracteristiques.2016.filtre$adr)
@@ -116,11 +121,17 @@ caracteristiques.2019.filtre$adr <- as.character(caracteristiques.2019.filtre$ad
 caracteristiques.2019.filtre$com <- as.numeric(caracteristiques.2019.filtre$com)
 
 ##result####
+<<<<<<< HEAD
 # <<<<<<< HEAD
 caracteristiques.filtre <- bind_rows(caracteristiques.2018.filtre, caracteristiques.2019.filtre)
 # =======
 caracteristiques.filtre <- bind_rows(caracteristiques.2016.filtre, caracteristiques.2017.filtre, caracteristiques.2018.filtre, caracteristiques.2019.filtre)
 # >>>>>>> 86df7ff4264fc2f69f7b28818e2db8bd368963c4
+=======
+caracteristiques.filtre <- bind_rows(caracteristiques.2018.filtre, caracteristiques.2019.filtre)
+caracteristiques.filtre <- bind_rows(caracteristiques.2016.filtre, caracteristiques.2017.filtre, caracteristiques.2018.filtre, caracteristiques.2019.filtre)
+
+>>>>>>> f21e42bbec2ae6c9c8071a5ad868f19357adf09c
 
 # Selection des données de l'année. A retravailler pour faire une sélection groupée / fusionnée.
 # caracteristiques.filtre <- caracteristiques.2016.filtre
