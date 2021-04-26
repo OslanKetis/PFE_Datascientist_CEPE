@@ -1,0 +1,111 @@
+---
+title: "Corpo Analyse"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(caret)
+```
+
+# Import et aggrégations de données
+
+```{r}
+caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
+carac.erronnes <- c(201900033874, 201900035540, 201900035541, 201900007105, 201900058723, 201900017468, 201900005927, 201900033236, 201900006562
+                    , 201900056421, 201900000632, 201900057241, 201900048863, 201900008746, 201900056494, 201900047454, 201900021441, 201900025903
+                    ,201900020406)
+caracteristiques.filtre <- caracteristiques.2019 %>% filter(!Num_Acc %in% carac.erronnes)
+
+lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
+
+vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
+
+usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
+
+acc_place_19 <- inner_join(caracteristiques.filtre,lieux.2019,by=c("Num_Acc"="Num_Acc"))
+
+user_car_19<- inner_join(vehicules.2019,usagers.2019,by=c("Num_Acc"="Num_Acc", "id_vehicule" = "id_vehicule", "num_veh" = "num_veh"))
+
+total_19 <- inner_join(acc_place_19,user_car_19,by=c("Num_Acc"="Num_Acc"))
+
+```
+
+## Preprocessing
+```{r}
+
+# Approche par les conditions
+crit_condition = total_19[c("Num_Acc","lum","agg","int","atm","catr","circ","surf","prof","hrmn")]
+
+# Apporche par l'impact sur véhicule
+crit_impact = total_19[c("Num_Acc","col")]
+
+crit_condition <- crit_condition %>% mutate_all(as.factor)
+summary(crit_condition)
+
+# Par soucis de simplification on regroupe les luminosités
+# Nuit avec éclairage public non allumé --> Nuit sans éclairage public
+# Nuit avec éclairage public allumé --> Crépuscule ou aube
+levels(crit_condition$lum) <-  factor(c("1", "2", "3", "3", "2"))
+
+# Intersection
+levels(crit_condition$int) <-  factor(c("1", "2", "2", "2", "2", "3", "3", "4", "5" ))
+
+# Conditions Atmosphériques
+levels(crit_condition$atm) <-  factor(c("1", "1", "1", "2", "3","3", "3", "2", "1", "1"))
+
+# Catégories de routes
+levels(crit_condition$catr) <-  factor(c("1", "1", "1", "2", "2", "3", "1", "4"))
+
+# Regime de circulation
+levels(crit_condition$circ) <-  factor(c("0", "1", "2", "1", "3"))
+
+# Surface: regroupement pour simplification
+# 0 : NR, 1: Normale, 2: Glissant, 3: Eau, 4: Autre
+# levels(crit_condition$surf) <-  factor(c("0", "1", "2", "3", "3","2", "3", "2", "2","4"))
+levels(crit_condition$surf) <-  factor(c("0", "1", "2", "3", "3","2", "3", "2", "2","4"))
+
+# Profil de la route
+levels(crit_condition$prof) <-  factor(c("0", "1", "2", "3", "4"))
+
+```
+
+
+# Analyses
+## ACP
+```{r}
+summary(crit_condition)
+dim(crit_condition)
+```
+
+On limite le champs d'analyse à 6 vars
+
+```{r}
+data = crit_condition %>% 
+  mutate_all(as.character)
+data <- data %>% select(-c(1,7,9,10))
+d.m <- dummyVars(" ~ .", data = data)
+data_ohe <- data.frame(predict(d.m, newdata = data))
+```
+
+
+
+```{r}
+library(FactoMineR)
+res.pca <- PCA(data_ohe)
+```
+
+En condition de plein jour sur surface normale et en condition atmosphérique normale.
+Hors agglomeration, hors intersection et sur routes
+En agglomeration, sur voie communales ou hors réseau public
+
+```{r}
+barplot(res.pca$eig[,2], 
+        names=paste("Dim",1:nrow(res.pca$eig)),
+        main="inertie expliquée")
+```
+```{r}
+plot(res.pca,choix="var", axes = c(1,2))
+```
+
