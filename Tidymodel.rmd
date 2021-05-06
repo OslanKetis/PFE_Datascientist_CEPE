@@ -1,0 +1,116 @@
+---
+title: "Tidymodels"
+output: html_notebook
+---
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+
+colnames(total_19)
+gravity <- total_19 %>% select(grav, sexe, an_nais, secu_or_not,trajet, secu_level, lat, long)%>%   
+  filter(!is.na(grav)) %>% 
+  mutate(grav_or_not = 
+        case_when(
+        grav == "1" | grav == "3" ~ "1",
+        TRUE ~ "2"
+        )
+  ) %>% 
+  mutate(age = 2019-an_nais) %>% 
+  mutate(grav_or_not = as.factor(grav_or_not),
+         sexe = as.factor(sexe),
+         trajet = as.factor(trajet),
+         secu_or_not = as.factor(secu_or_not),
+         secu_level = as.factor(secu_level)
+         ) %>%
+  select(-grav, -an_nais)
+
+gravity %>% group_by(grav_or_not) %>% 
+  summarise(n=n())
+  
+glimpse(gravity)
+
+```
+
+
+
+# il faudrait faire quelques ggplot
+```{r}
+
+```
+
+# Y = ArrDelay
+# X = DepDelay, UniqueCarrier, Dest
+```{r}
+
+set.seed(1234)
+
+
+ames_split <- initial_split(gravity, prob = 0.80)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+# ames_test_small <- ames_test %>% head(5)
+
+dim(ames_train)
+dim(ames_test)
+colnames(ames_train)
+
+```
+```{r}
+ames_rec <-
+  recipe(grav_or_not ~ ., data = ames_train) %>%
+#   step_other(UniqueCarrier, threshold = 0.01) %>%
+#   # step_mutate(DepDelay = log(1-min(DepDelay)+DepDelay))%>%
+#   step_mutate(DepDelay=log(1-min(DepDelay)+DepDelay))%>%
+  step_dummy(all_nominal(), -grav_or_not)
+  # %>%
+#   step_interact( ~ DepDelay:starts_with("UniqueCarrier_") ) %>%
+#   step_ns(DepDelay, deg_free = 20)
+
+# ces lignes de code dessous pour visualiser la design matrice
+ames_rec_prepped <- prep(ames_rec) # si je met pas de parametre data, il va prendre le meme que 
+
+# hf_train_prepped <-  bake(ames_rec_prepped, new_data = NULL) # cest notre matrice_design
+# hf_test_prepped <- bake(ames_rec_prepped, new_data = ames_test)
+
+matrice_design <- bake(ames_rec_prepped, new_data = NULL)
+matrice_design
+dim(matrice_design)
+colnames(matrice_design)
+
+```
+# Y = ArrDelay
+# X = DepDelay, UniqueCarrier, Dest
+
+# https://parsnip.tidymodels.org/reference/
+```{r}
+
+
+log_model <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+  
+  
+
+# library(ranger)
+# rf_model <-
+#   rand_forest(trees = 10) %>% # normalement trees = 1000 mais trop long
+#   set_engine("ranger") %>%
+#   set_mode("regression") # inutle
+
+lm_wflow <-
+  workflow() %>%
+  add_model(log_model) %>%
+  add_recipe(ames_rec)
+  
+lm_fit <- fit(lm_wflow, ames_train)
+
+lm_pred <- ames_test %>%
+  select(grav_or_not) %>%
+  bind_cols(predict(lm_fit, ames_test, type='prob')) 
+# %>%
+#   bind_cols(predict(lm_fit, ames_test, type = "pred_int")) # pour RandomForest il ny a pas de pred_int
+
+lm_pred
+
+```
