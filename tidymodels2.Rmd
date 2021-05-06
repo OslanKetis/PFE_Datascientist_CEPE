@@ -1,0 +1,529 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+install.packages("mongolite")
+library(mongolite)
+library(tidyverse)
+library(jsonlite)
+library(tidymodels)
+library(tinytex)
+```
+
+```{r}
+data(ames)
+Ames <- ames
+glimpse(ames)
+```
+
+```{r}
+ames %>%
+ggplot() +
+aes(x = Sale_Price) +
+geom_histogram(bins = 50) +
+scale_x_log10()
+```
+
+
+# nous travaillerons sur les prix transformés log10
+```{r}
+str(Ames)
+
+ames <- Ames %>%
+mutate(Sale_Price = log10(Sale_Price)) %>%
+select(Sale_Price, Neighborhood, Gr_Liv_Area, Year_Built, Bldg_Type)
+```
+
+# option prob : chaque observation a 0.80 de probabilité à être inclue.
+```{r}
+set.seed(123)
+# Save the split information for an 80/20 split of the data
+ames_split <- initial_split(ames, prob = 0.80)
+ames_split
+
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+dim(ames_test)
+```
+```{r}
+ames_train %>%
+ggplot() +
+aes(x = Sale_Price) +
+geom_histogram(bins = 50)
+```
+
+```{r}
+ames_test %>%
+ggplot() +
+aes(x = Sale_Price) +
+geom_histogram(bins = 50)
+```
+
+# stratifier par rapport à la variable Y : Diapo page 14
+# car la distribution de deux sets n'est pas pareil : on risque de mettre le prix le plus elevé dans un set ou l'autre
+```{r}
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+```
+
+# on peut tester un lm mais lm fait trop de chose implicites
+```{r}
+lm(Sale_Price ~ Neighborhood +
+  log10(Gr_Liv_Area) +
+  Year_Built +
+  Bldg_Type,
+data = ames_train)
+```
+
+
+# Pour eviter un mélange des genres décrit à la page 17 diapo
+# step_dummy code toutes les variables qualitative, all_nominal() selectionne toutes les variables nominal (ie tous les facteurs), il faut donc que les variables string soit traitées en facteur auparavant : 
+# est ce que toutes les strings méritent d'être transformé en facteur? pas formécemntles facteurs 1) ont peu de modalités 2) si je change de nom, cela n'a pas d'impact par exemple la colonne adresse
+# je fais ici ce que j'ai fait au-dessus pour lm mais tout est explicite
+# par contre quel étape je fais en tidyverse ou en tidymodel : par exemple, log10 de X on le fait en tidymodel, log10 de X on le fait en tidyverse
+
+# Avantage 1 : Les recettes pourront servir à plusieurs modèles (compatibles mais on verra qu’il y en a de plus en plus). Elles ne sont pas couplées aux fonctions statistiques comme lm() ou glmnet().
+```{r}
+simple_ames <- recipe(
+  Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+  data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_dummy(all_nominal())
+
+simple_ames <- recipe(
+  Sale_Price ~ .,
+  data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_dummy(all_nominal())
+simple_ames
+class(simple_ames)
+```
+
+# préparer la recette
+# ces acp des données et je retiens 80% d'inertie. les resultats calculés pour  vont être utilisé pour test set
+
+# Dans ce cas là je dois faire step.pca() dans l'étape précédente => quels sont les variables créé, retenu, cela va être fait dans l'étape préparation. Dans recette, on défini, on les fait pas.
+<!-- Training data contained 2199 data points and no missing data. -->
+
+<!-- Operations: -->
+
+<!-- Log transformation on Gr_Liv_Area [trained] -->
+<!-- Dummy variables from Neighborhood, Bldg_Type [trained] -->
+```{r}
+simple_ames <- prep(simple_ames, training = ames_train)
+simple_ames
+```
+
+```{r}
+test_ex <- bake(simple_ames, new_data = ames_train)
+
+bake(simple_ames, new_data = NULL) # cette ligne va etre plus rapide que la ligne precedente meme si tous les deux donne la meme design matrice.
+test_ex <- bake(simple_ames, new_data = ames_test)
+names(test_ex) %>% head()
+```
+
+```{r}
+simple_ames %>%
+bake(new_data = NULL, starts_with("Nei")) %>%
+dim()
+
+
+simple_ames %>%
+bake(new_data = NULL, all_numeric()) %>%
+dim()
+# toutes les variables cotés sont des numeriques
+```
+
+# interaction entre surface (Gr_Liv_Area) et bldg_type après condage
+```{r}
+simple_ames <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+  data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal()) %>%
+  # Gr_Liv_Area is on the log scale from a previous step
+  step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>% 
+  step_interact( ~ starts_with("neigh"):starts_with("Bldg_Type_")) # je peux mettre deux interaction
+```
+
+
+# pour voir la design matrice et les nouvelles varialbles interactions
+```{r}
+
+simple_ames <- prep(simple_ames, training = ames_train)
+bake(simple_ames, new_data = NULL) 
+
+# equivalent a
+simple_ames %>% 
+  prep(training = ames_train) %>% 
+  bake(new_data = NULL) %>% 
+  select(contains("_x_")) %>% 
+  names()
+```
+
+
+# je 
+```{r}
+library(themis)
+
+# sous echantillonage 
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+  data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  themis::step_downsample(Neighborhood) %>%
+  prep() %>%
+  bake(new_data = NULL) %>%
+  ggplot(aes(y = Neighborhood)) +
+    geom_bar() +
+    labs(y = NULL)
+# sur echantillonage 
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type,
+  data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  themis::step_upsample(Neighborhood) %>%
+  prep() %>%
+  bake(new_data = NULL) %>%
+  ggplot(aes(y = Neighborhood)) +
+    geom_bar() +
+    labs(y = NULL)
+
+```
+
+# vignette pour avoir des exemples 
+# help -> cheatsheet
+```{r}
+
+vignette(package = "dplyr")
+vignette("colwise", package = "dplyr")
+
+```
+
+# on va que quand le degree bas, on a un phénomène de sur-lissage probleme de biais, quand le degree haut, on a un probleme de variance donc sur apprentissage
+```{r}
+library(patchwork)
+library(splines)
+plot_smoother <- function(deg_free) {
+    ggplot(Ames, aes(x = Latitude, y = Sale_Price)) +
+    geom_point(alpha = .2) +
+    scale_y_log10() +
+    geom_smooth(
+          method = lm,
+          formula = y ~ ns(x, df = deg_free),
+          col = "red",
+          se = FALSE
+    ) +
+    ggtitle(paste(deg_free, "Spline Terms"))
+}
+
+( plot_smoother(2) + plot_smoother(5) ) / ( plot_smoother(20) + plot_smoother(100) )
+```
+
+
+```{r}
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type + Latitude,
+data = Ames) %>%
+step_log(Gr_Liv_Area, base = 10) %>%
+step_other(Neighborhood, threshold = 0.01) %>%
+step_dummy(all_nominal()) %>%
+step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>%
+step_ns(Latitude, deg_free = 20) %>%
+## On devrait arrêter ICI. C'est juste pour visualiser ;-)
+prep() %>%
+bake(new_data = NULL) %>%
+select(contains("_ns"))
+
+```
+
+```{r}
+ames_rec_prepped <- prep(ames_rec)
+ames_train_prepped <- bake(ames_rec_prepped, new_data = NULL)
+ames_test_prepped <- bake(ames_rec_prepped, ames_test)
+
+lm_fit <- lm(Sale_Price ~ ., data = ames_train_prepped) # cest de la regression non parametrique. on va pas utiliser comme ainsi, mais ceci pour montrer que jai de la possibilite de mettre ma nouvelle design matrice
+```
+
+```{r}
+ames <- mutate(Ames, Sale_Price = log10(Sale_Price))
+set.seed(123)
+ames_split <- initial_split(ames, prob = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+ames_rec <-
+recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+Latitude + Longitude, data = ames_train) %>%
+step_log(Gr_Liv_Area, base = 10) %>%
+step_other(Neighborhood, threshold = 0.01) %>%
+step_dummy(all_nominal()) %>%
+step_interact( ~ Gr_Liv_Area:starts_with("Bldg_Type_") ) %>%
+step_ns(Latitude, Longitude, deg_free = 20)
+
+
+ames_rec_prepped <- prep(ames_rec)
+ames_train_prepped <- bake(ames_rec_prepped, new_data = NULL)
+ames_test_prepped <- bake(ames_rec_prepped, ames_test)
+# Fit the model; Note that the column Sale_Price has already been
+# log transformed.
+lm_fit <- lm(Sale_Price ~ ., data = ames_train_prepped)
+
+# on peut aussi faire une regression sous contrainte (a completer par la correction de Nicolas)
+# glmnet(x= ames_train_prepped %>% 
+#          select())
+
+coefficients(lm_fit)
+glance(lm_fit)
+tidy(lm_fit)
+
+predict(lm_fit, ames_test_prepped %>% head(10))
+```
+
+## Parsnip
+
+```{r}
+linear_reg() %>% set_engine("lm") %>% translate()
+linear_reg() %>% set_engine("glmnet") %>% translate()
+linear_reg() %>% set_engine("stan") %>% translate()
+```
+
+```{r}
+lm_model <-
+linear_reg() %>%
+set_engine("lm") # on peut changer glmnet en lm, on na plus du tout besoin de soccuper de la matrice en entree
+lm_model
+
+lm_form_fit <-
+lm_model %>%
+fit(
+Sale_Price ~ Longitude + Latitude,
+data = ames_train
+)
+lm_form_fit
+
+lm_xy_fit <-
+lm_model %>%
+fit_xy(
+x = ames_train %>% select(Longitude, Latitude),
+y = ames_train %>% pull(Sale_Price)
+)
+lm_xy_fit
+```
+
+
+
+```{r}
+rand_forest(trees = 1000, min_n = 5) %>%
+  set_engine("ranger") %>% # ranger est parallele donc plus rapidement
+  set_mode("regression") %>% # dans RF 
+  translate()
+
+lm_xy_fit %>% pluck("fit") # lm_form_fit$fit
+tidy(lm_xy_fit)
+
+```
+# https://parsnip.tidymodels.org/reference/
+
+```{r}
+ames_test_small <- ames_test %>% slice(1:5)
+predict(lm_form_fit, new_data = ames_test_small)
+```
+
+# coller les variables de prediction une après une
+```{r}
+ames_test_small %>%
+  select(Sale_Price) %>%
+  bind_cols(predict(lm_form_fit, ames_test_small)) %>%
+  # Add 95% prediction intervals to the results:
+  bind_cols(predict(lm_form_fit, ames_test_small, type = "pred_int"))
+```
+
+```{r}
+tree_model <-
+  decision_tree(min_n = 2) %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+
+tree_fit <-
+  tree_model %>%
+  fit(Sale_Price ~ Longitude + Latitude, data = ames_train)
+
+ames_test_small %>%
+  select(Sale_Price) %>%
+  bind_cols(predict(tree_fit, ames_test_small))
+```
+
+## workflow
+
+```{r}
+lm_model <-
+  linear_reg() %>%
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>% 
+  add_formula(Sale_Price~Longitude + Latitude) # on peut mettre ici une recette
+
+lm_wflow
+
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+
+glance(lm_fit)
+tidy(lm_fit)
+
+```
+
+# workflow => permet de modifier rapidement les élements de differents étapes
+```{r}
+lm_wflow %>% update_formula(Sale_Price ~ Longitude)
+
+lm_wflow %>% remove_formula()
+```
+
+# recette
+# avantage workflow est qu'on a pas besoin de preparer et bake les données. Il le prépare automatiquement (ames_train est passé ames_rec_prepped directement)
+
+```{r}
+ames_rec # recette
+
+
+
+lm_wflow <-
+  lm_wflow %>%
+  remove_formula() %>% # car javais une formule. il faut que je le supprime
+  add_recipe(ames_rec)
+
+my_fit <- fit(lm_wflow, ames_train)
+
+predict(my_fit, ames_test)
+predict(my_fit, ames_test, type = "pred_int")
+
+
+```
+
+# exercice
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(hflights)
+data(hflights)
+
+hflights <- na.omit(hflights) 
+
+hflights <-  as_tibble(hflights) %>% 
+  select(ArrDelay, DepDelay, Dest, UniqueCarrier) %>% 
+  filter(!is.na(ArrDelay)) %>%
+  filter(!is.na(DepDelay)) %>% 
+  mutate(Dest = as.factor(Dest),
+         UniqueCarrier = as.factor(UniqueCarrier),
+         ArrDelay = log(1-min(ArrDelay, na.omit=TRUE)+ArrDelay))
+
+glimpse(hflights)
+
+```
+
+
+
+
+# il faudrait faire quelques ggplot
+```{r}
+
+```
+
+# Y = ArrDelay
+# X = DepDelay, UniqueCarrier, Dest
+```{r}
+
+
+
+set.seed(1234)
+
+
+ames_split <- initial_split(hflights, prob = 0.80, strata = ArrDelay)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+# ames_test_small <- ames_test %>% head(5)
+
+dim(ames_train)
+dim(ames_test)
+colnames(hflights)
+```
+```{r}
+
+
+ames_rec <-
+  recipe(ArrDelay ~ DepDelay + UniqueCarrier + Dest, data = ames_train) %>%
+  step_other(UniqueCarrier, threshold = 0.01) %>%
+  # step_mutate(DepDelay = log(1-min(DepDelay)+DepDelay))%>%
+  step_mutate(DepDelay=log(1-min(DepDelay)+DepDelay))%>%
+  step_dummy(all_nominal()) %>%
+  step_interact( ~ DepDelay:starts_with("UniqueCarrier_") ) %>%
+  step_ns(DepDelay, deg_free = 20)
+
+# ces lignes de code dessous pour visualiser la design matrice
+ames_rec_prepped <- prep(ames_rec) # si je met pas de parametre data, il va prendre le meme que 
+
+hf_train_prepped <-  bake(ames_rec_prepped, new_data = NULL) # cest notre matrice_design
+hf_test_prepped <- bake(ames_rec_prepped, new_data = ames_test)
+
+matrice_design <- bake(ames_rec_prepped, new_data = NULL)
+matrice_design
+dim(matrice_design)
+
+```
+# Y = ArrDelay
+# X = DepDelay, UniqueCarrier, Dest
+
+
+```{r}
+
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+library(ranger)
+rf_model <-
+  rand_forest(trees = 10) %>% # normalement trees = 1000 mais trop long
+  set_engine("ranger") %>%
+  set_mode("regression") # inutle
+
+lm_wflow <-
+  workflow() %>%
+  add_model(rf_model) %>%
+  add_recipe(ames_rec)
+  
+lm_fit <- fit(lm_wflow, ames_train)
+
+lm_pred <- ames_test %>%
+  select(ArrDelay) %>%
+  bind_cols(predict(lm_fit, ames_test)) %>%
+  bind_cols(predict(lm_fit, ames_test, type = "pred_int")) # pour RandomForest il ny a pas de pred_int
+
+lm_pred
+
+```
+
+# On essaie de faire à la main sans workflow (à completer avec la correction de prof)
+```{r}
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_xy_fit <- lm_model %>% 
+fit_xy(
+  x= matrice_design %>% select(-ArrDelay),
+  y= matrice_design %>% pull(ArrDelay) 
+)
+
+predict(lm_xy_fit, hf_test_prepped)
+
+
+```
+
