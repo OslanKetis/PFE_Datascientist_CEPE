@@ -7,12 +7,13 @@ output: html_notebook
 library(tidymodels)
 library(tidyverse)
 
-colnames(total_19)
-gravity <- total_19 %>% select(grav, sexe, an_nais, secu_or_not,trajet, secu_level, lat, long)%>%   
+# colnames(total_19)
+gravity <- total_19%>% 
   filter(!is.na(grav)) %>% 
+  filter(grepl("^75", dep)) %>% 
   mutate(grav_or_not = 
         case_when(
-        grav == "1" | grav == "3" ~ "1",
+        grav == "2" | grav == "3" ~ "1",
         TRUE ~ "2"
         )
   ) %>% 
@@ -23,12 +24,13 @@ gravity <- total_19 %>% select(grav, sexe, an_nais, secu_or_not,trajet, secu_lev
          secu_or_not = as.factor(secu_or_not),
          secu_level = as.factor(secu_level)
          ) %>%
-  select(-grav, -an_nais)
+  select(grav_or_not, sexe, age, secu_or_not,trajet, secu_level, lat, long)
 
 gravity %>% group_by(grav_or_not) %>% 
   summarise(n=n())
   
 glimpse(gravity)
+colnames(total_19)
 
 ```
 
@@ -39,8 +41,7 @@ glimpse(gravity)
 
 ```
 
-# Y = ArrDelay
-# X = DepDelay, UniqueCarrier, Dest
+# Définition de trainning set et test set
 ```{r}
 
 set.seed(1234)
@@ -56,6 +57,8 @@ dim(ames_test)
 colnames(ames_train)
 
 ```
+
+# Définition de recette basique et visualisation de design matrice
 ```{r}
 ames_rec <-
   recipe(grav_or_not ~ ., data = ames_train) %>%
@@ -68,7 +71,7 @@ ames_rec <-
 #   step_ns(DepDelay, deg_free = 20)
 
 # ces lignes de code dessous pour visualiser la design matrice
-ames_rec_prepped <- prep(ames_rec) # si je met pas de parametre data, il va prendre le meme que 
+ames_rec_prepped <- prep(ames_rec) # si je met pas de parametre data, il va prendre le meme que la recette
 
 # hf_train_prepped <-  bake(ames_rec_prepped, new_data = NULL) # cest notre matrice_design
 # hf_test_prepped <- bake(ames_rec_prepped, new_data = ames_test)
@@ -79,38 +82,369 @@ dim(matrice_design)
 colnames(matrice_design)
 
 ```
-# Y = ArrDelay
-# X = DepDelay, UniqueCarrier, Dest
 
+## Definition des modèles
 # https://parsnip.tidymodels.org/reference/
+
+# Log
 ```{r}
 
 
 log_model <- logistic_reg() %>% 
   set_engine("glm") %>% 
   set_mode("classification")
-  
-  
 
-# library(ranger)
-# rf_model <-
-#   rand_forest(trees = 10) %>% # normalement trees = 1000 mais trop long
-#   set_engine("ranger") %>%
-#   set_mode("regression") # inutle
 
-lm_wflow <-
+log_wflow <-
   workflow() %>%
   add_model(log_model) %>%
   add_recipe(ames_rec)
   
-lm_fit <- fit(lm_wflow, ames_train)
+log_fit <- fit(log_wflow, ames_train)
 
-lm_pred <- ames_test %>%
+log_pred <- ames_test %>%
   select(grav_or_not) %>%
-  bind_cols(predict(lm_fit, ames_test, type='prob')) 
+  bind_cols(predict(log_fit, ames_test, type='prob')) 
 # %>%
 #   bind_cols(predict(lm_fit, ames_test, type = "pred_int")) # pour RandomForest il ny a pas de pred_int
 
-lm_pred
+log_pred
 
 ```
+
+# LASSO/Ridge regression
+
+```{r}
+
+```
+
+
+# Ramdon forest
+```{r}
+  
+
+library(ranger)
+rf_model <-
+  rand_forest(trees = 10) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_wflow <-
+  workflow() %>%
+  add_recipe(ames_rec) %>% 
+  add_model(rf_model)
+
+# rf_fit et rf_pred n'est pas forcement necessaire à cette étape. on peut directement passer a la validation
+rf_fit <- 
+  fit(rf_wflow, ames_train)
+
+rf_pred <- ames_test %>%
+  select(grav_or_not) %>%
+  bind_cols(predict(rf_fit, ames_test, type='prob')) 
+   
+rf_pred
+
+```
+
+# General Interface for Boosted Trees
+```{r}
+library(xgboost)
+
+xgboost_model <- 
+  parsnip::boost_tree(
+    mode = "classification",
+    trees = 10,
+    sample_size =0.1
+    # min_n = tune(),
+    # tree_depth = tune(),
+    # learn_rate = tune(),
+    # loss_reduction = tune()
+  ) %>%
+    set_engine("xgboost", objective = "reg:squarederror")
+
+xgboost_wf <- 
+  workflows::workflow() %>%
+  add_model(xgboost_model) %>%
+  add_recipe(ames_rec)
+
+bt_fit <-
+  fit(xgboost_wf, ames_train)
+
+bt_pred <- ames_test %>%
+  select(grav_or_not) %>%
+  bind_cols(predict(bt_fit, ames_test, type='prob'))
+
+bt_pred
+
+# 
+# 
+# library(spark)
+# library(C50)
+# 
+# 
+# boosted_trees <- 
+#   boost_tree(sample_size = tune()) %>% 
+#   set_engine("C5.0") %>% 
+#   set_mode("classification")
+# 
+# parameters(boosted_trees)
+# 
+# bt_wflow <-
+#   workflow() %>%
+#   add_recipe(ames_rec) %>% 
+#   add_model(boosted_trees)
+# 
+# bt_wflow %>% 
+#   parameters() %>% 
+#   pull_dials_object("sample_size")
+# 
+# # rf_fit et rf_pred n'est pas forcement necessaire à cette étape. on peut directement passer a la validation
+# bt_fit <- 
+#   fit(bt_wflow, ames_train)
+# 
+# bt_pred <- ames_test %>%
+#   select(grav_or_not) %>%
+#   bind_cols(predict(bt_fit, ames_test, type='prob')) 
+#    
+# bt_pred
+
+# library(rpart)
+# decision_tree() %>% 
+#   set_engine("rpart") %>% 
+#   set_mode("classification")
+# 
+# tree_wflow <-
+#   workflow() %>%
+#   add_recipe(ames_rec) %>% 
+#   add_model(decision_tree)
+```
+
+
+
+# linear support vector machines
+
+```{r}
+svm_linear() %>% 
+  set_engine("LiblineaR") %>% 
+  set_mode("classification") %>% 
+  translate()
+```
+
+
+## Evaluation d'un modèle. En réalité on va utiliser tidymodels Workflows collection (plus tard)
+# Validation croisée
+# Combine metric functions :  https://yardstick.tidymodels.org/
+
+```{r}
+
+# ames_resampling <- vfold_cv(ames_train, v = 10,)
+# # ici on peut aussi faire un bootstrapping
+# 
+# keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+# 
+# rf_results <- rf_wflow %>% 
+#   fit_resamples(resamples = ames_resampling,
+#                 metrics = metric_set(accuracy, roc_auc, pr_auc),
+#                 control = keep_pred)
+# 
+# 
+# collect_metrics(rf_results)
+# 
+# assess_res <- collect_predictions(rf_results)
+# 
+# 
+# assess_res %>%
+#   select(.pred_class,grav_or_not) %>% 
+#   group_by(.pred_class,grav_or_not) %>% 
+#   summarise(n=n())
+# 
+# 
+# 
+# ### ici il faut creer une matrice
+# 
+# ggplot(data = assess_res, aes(x = grav_or_not, y = .pred_class)) +
+#   geom_col(aes(fill = grav_or_not), width = 0.7)
+# 
+
+```
+
+# Comparing models with resampling
+# https://www.tmwr.org/compare.html
+
+# Create a Collection of recipes
+
+
+
+```{r}
+ames_resampling <- vfold_cv(ames_train, v = 3,)
+keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+
+interaction_rec <- 
+  ames_rec %>% 
+  step_interact( ~ starts_with("secu_or_not_"):starts_with("trajet_")) 
+
+spline_rec <- 
+  interaction_rec %>% 
+  step_ns(lat, long, deg_free = 20)
+
+preproc <- 
+  list(basic = ames_rec, 
+       interact = interaction_rec, 
+       splines = spline_rec
+  )
+
+
+
+
+```
+
+## Create a Collection of tidymodels Workflows
+# https://workflowsets.tidymodels.org/
+
+```{r}
+chi_models <- 
+   workflow_set(
+      preproc = list( basic = ames_rec, 
+                      interact = interaction_rec, 
+                      splines = spline_rec),
+      models = list(log = log_model,
+                    rf=rf_model,
+                    bt=xgboost_model),
+                    # glmnet = regularized_spec, 
+                    # cart = cart_spec, 
+                    # knn = knn_spec),
+      cross = TRUE
+   )
+chi_models
+
+# regarder a quoi cela sert
+# chi_models <- 
+#    chi_models %>% 
+#    anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
+#              by = "wflow_id")
+
+
+
+```
+
+# Fit a collection of tidymodels Workflows
+
+```{r}
+chi_models <- 
+  chi_models %>% 
+  workflow_map("fit_resamples", 
+               # Options to `workflow_map()`: 
+               seed = 1101, verbose = TRUE,
+               # Options to `fit_resamples()`: 
+               resamples = ames_resampling, 
+               # fn = "tune_grid",
+               metrics = metric_set(accuracy,roc_auc, pr_auc),  
+               control = keep_pred)
+
+
+
+```
+
+# recuperer les metrics
+
+```{r}
+collect_metrics(chi_models)
+
+```
+
+# recuperer les resultats de prediction (pour faire des visualisations ou Interpretable Machine Learning)
+
+```{r}
+collect_predictions(chi_models)
+assess_res <- collect_predictions(chi_models)
+assess_res
+dim(assess_res)
+```
+
+
+```{r}
+autoplot(chi_models, metric = "accuracy")
+autoplot(chi_models, metric = "roc_auc")
+autoplot(chi_models, metric = "pr_auc")
+
+```
+
+
+## Tunning
+
+# Tuning le recette
+
+```{r}
+
+```
+
+
+# Tuning le model
+```{r}
+
+
+xgboost_model <- 
+  parsnip::boost_tree(
+    mode = "classification",
+    trees = 10,
+    min_n = tune(),
+    tree_depth = tune(),
+    learn_rate = tune(),
+    loss_reduction = tune()
+  ) %>%
+  set_engine("xgboost", objective = "reg:squarederror")
+
+xgboost_params <- 
+  dials::parameters(
+    min_n(),
+    tree_depth(),
+    learn_rate(),
+    loss_reduction()
+  )
+
+xgboost_params
+
+xgboost_grid <- 
+  dials::grid_max_entropy(
+    xgboost_params, 
+    size = 60
+  )
+
+knitr::kable(head(xgboost_grid))
+
+xgboost_wf <- 
+  workflows::workflow() %>%
+  add_model(xgboost_model) %>%
+  add_recipe(ames_rec)
+
+
+xgboost_tuned <- tune::tune_grid(
+  object = xgboost_wf,
+  resamples = ames_resampling,
+  grid = xgboost_grid,
+  metrics = yardstick::metric_set(accuracy,roc_auc, pr_auc),
+  control = tune::control_grid(verbose = TRUE)
+  )
+
+
+xgboost_tuned %>%
+  tune::show_best(metric = "roc_auc") %>%
+  knitr::kable()
+```
+
+## essaie d'inclure tune_grid dans workflow_map
+# https://workflowsets.tidymodels.org/reference/workflow_map.html
+
+# https://tune.tidymodels.org/reference/tune_grid.html
+
+```{r}
+workflow_map(
+  object,
+  fn = "tune_grid",
+  verbose = FALSE,
+  seed = sample.int(10^4, 1),
+  ...
+)
+```
+
+
