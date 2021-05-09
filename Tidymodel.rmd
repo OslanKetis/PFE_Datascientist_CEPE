@@ -85,6 +85,7 @@ colnames(matrice_design)
 
 ## Definition des modèles
 # https://parsnip.tidymodels.org/reference/
+# https://www.tmwr.org/workflow-sets.html
 
 # Log
 ```{r}
@@ -113,6 +114,7 @@ log_pred
 ```
 
 # LASSO/Ridge regression
+# https://juliasilge.com/blog/lasso-the-office/
 
 ```{r}
 
@@ -176,47 +178,6 @@ bt_pred <- ames_test %>%
 
 bt_pred
 
-# 
-# 
-# library(spark)
-# library(C50)
-# 
-# 
-# boosted_trees <- 
-#   boost_tree(sample_size = tune()) %>% 
-#   set_engine("C5.0") %>% 
-#   set_mode("classification")
-# 
-# parameters(boosted_trees)
-# 
-# bt_wflow <-
-#   workflow() %>%
-#   add_recipe(ames_rec) %>% 
-#   add_model(boosted_trees)
-# 
-# bt_wflow %>% 
-#   parameters() %>% 
-#   pull_dials_object("sample_size")
-# 
-# # rf_fit et rf_pred n'est pas forcement necessaire à cette étape. on peut directement passer a la validation
-# bt_fit <- 
-#   fit(bt_wflow, ames_train)
-# 
-# bt_pred <- ames_test %>%
-#   select(grav_or_not) %>%
-#   bind_cols(predict(bt_fit, ames_test, type='prob')) 
-#    
-# bt_pred
-
-# library(rpart)
-# decision_tree() %>% 
-#   set_engine("rpart") %>% 
-#   set_mode("classification")
-# 
-# tree_wflow <-
-#   workflow() %>%
-#   add_recipe(ames_rec) %>% 
-#   add_model(decision_tree)
 ```
 
 
@@ -228,6 +189,16 @@ svm_linear() %>%
   set_engine("LiblineaR") %>% 
   set_mode("classification") %>% 
   translate()
+
+svm_res <- tune_grid(svm_mod, car_rec, resamples = folds, grid = 7)
+svm_res
+
+
+```
+
+# Neural Network
+```{r}
+
 ```
 
 
@@ -317,6 +288,8 @@ chi_models <-
    )
 chi_models
 
+
+
 # regarder a quoi cela sert
 # chi_models <- 
 #    chi_models %>% 
@@ -332,7 +305,7 @@ chi_models
 ```{r}
 chi_models <- 
   chi_models %>% 
-  workflow_map("fit_resamples", 
+  workflow_map(#"fit_resamples", 
                # Options to `workflow_map()`: 
                seed = 1101, verbose = TRUE,
                # Options to `fit_resamples()`: 
@@ -371,19 +344,12 @@ autoplot(chi_models, metric = "pr_auc")
 
 
 ## Tunning
-
-# Tuning le recette
-
-```{r}
-
-```
-
+# Trois cas pour faire la tuning, la difficulté est de recupérer les paramètres tuning depuis un workflow_map (car show_best ne fonctionne qu'avec un tuning_grid (ie un model et un recette))
 
 # Tuning le model
 ```{r}
 
-
-xgboost_model <- 
+xgboost_model_tune <- 
   parsnip::boost_tree(
     mode = "classification",
     trees = 10,
@@ -394,13 +360,26 @@ xgboost_model <-
   ) %>%
   set_engine("xgboost", objective = "reg:squarederror")
 
-xgboost_params <- 
-  dials::parameters(
-    min_n(),
-    tree_depth(),
-    learn_rate(),
-    loss_reduction()
-  )
+```
+
+# Tuning le recette
+
+```{r}
+
+spline_rec_tune <- 
+  interaction_rec %>% 
+  step_ns(lat, long, deg_free = tune())
+parameters(spline_rec_tune)
+
+
+```
+
+
+# Cas 1 : Tuning modele et tuning recette, mais seulement 1 à 1 (pas de workflow_map)
+
+```{r}
+
+parameters(xgboost_model_tune)
 
 xgboost_params
 
@@ -414,17 +393,21 @@ knitr::kable(head(xgboost_grid))
 
 xgboost_wf <- 
   workflows::workflow() %>%
-  add_model(xgboost_model) %>%
-  add_recipe(ames_rec)
+  add_model(xgboost_model_tune) %>%
+  add_recipe(spline_rec_tune)
+
+flow_param <- parameters(xgboost_wf)
 
 
 xgboost_tuned <- tune::tune_grid(
   object = xgboost_wf,
   resamples = ames_resampling,
-  grid = xgboost_grid,
+  grid = flow_param %>% grid_regular(levels = 2),
   metrics = yardstick::metric_set(accuracy,roc_auc, pr_auc),
   control = tune::control_grid(verbose = TRUE)
   )
+
+flow_param %>% grid_regular(levels = 2)
 
 
 xgboost_tuned %>%
@@ -432,19 +415,167 @@ xgboost_tuned %>%
   knitr::kable()
 ```
 
-## essaie d'inclure tune_grid dans workflow_map
-# https://workflowsets.tidymodels.org/reference/workflow_map.html
-
-# https://tune.tidymodels.org/reference/tune_grid.html
+# Cas 2 : Tuning recette, ne pas tuning les modèles, travailler avec workflow
 
 ```{r}
-workflow_map(
-  object,
-  fn = "tune_grid",
-  verbose = FALSE,
-  seed = sample.int(10^4, 1),
-  ...
-)
+preproc <- 
+  list(basic = ames_rec, 
+       interact = interaction_rec, 
+       splines = spline_rec
+  )
+
+
+chi_models <- 
+   workflow_set(
+      preproc = list( #basic = ames_rec, 
+                      #interact = interaction_rec, 
+                      splines_tune = spline_rec_tune),
+      models = list(log = log_model,
+                    #rf=rf_model,
+                    bt =xgboost_model),
+      cross = TRUE
+   )
+
+chi_models
 ```
 
 
+# A voir comment collecter les parameters tuning recette quand c'est passé par workflow_map
+
+https://parsnip.tidymodels.org/articles/articles/Submodels.html
+
+
+```{r}
+
+
+chi_models <-
+  chi_models %>%
+  workflow_map(
+    # Options to `tune_grid()`
+    resamples = ames_resampling,
+    grid = 20,
+    metrics = metric_set(accuracy, roc_auc, pr_auc),
+    # Options to `workflow_map()`
+    seed = 3,
+    verbose = TRUE
+  )
+chi_models
+
+
+chi_models$result
+
+rank_results(chi_models)
+autoplot(chi_models)
+autoplot(chi_models, select_best = TRUE)
+
+rank_results(chi_models, rank_metric = "roc_auc", select_best = TRUE)
+
+# splines_tune_log est classe en 1er
+
+```
+
+# passer à cas 1 pour recuperer le parameter degree
+```{r}
+
+wflow_param <-
+  workflow() %>%
+  add_recipe(spline_rec_tune) %>%
+  add_model(log_model) %>%
+  parameters()
+
+
+log_Spline_tune <- 
+  workflow() %>%
+  add_recipe(spline_rec_tune) %>%
+  add_model(log_model) %>%
+  tune_grid(
+    resamples = ames_resampling,
+    grid = wflow_param %>% grid_regular(levels = 8),
+    metrics = metric_set(accuracy,roc_auc, pr_auc)
+  )
+
+log_Spline_tune %>%
+  tune::show_best(metric = "accuracy") %>%
+  knitr::kable()
+
+# selon la dernier commande degree 3 est legerement mieux
+```
+
+# Cas 3 : Tuning les modèles mais ne pas tuning la recette. Puis pousser directement la meilleure modèle dans workflow pour prédire. 
+
+
+```{r}
+chi_models
+
+
+chi_models <- 
+   workflow_set(
+      preproc = list( #basic = ames_rec, 
+                      #interact = interaction_rec, 
+                      splines = spline_rec),
+      models = list(log = log_model,
+                    #rf=rf_model,
+                    bt_tune=xgboost_model_tune),
+      cross = TRUE
+   )
+chi_models
+
+
+
+chi_models <- 
+  chi_models %>% 
+  workflow_map(#"fit_resamples", 
+               # Options to `workflow_map()`: 
+               seed = 1101, verbose = TRUE,
+               # Options to `fit_resamples()`: 
+               resamples = ames_resampling, 
+               grid = 20,
+               metrics = metric_set(accuracy, roc_auc, pr_auc), 
+               control = keep_pred)
+
+
+rank_results(chi_models, rank_metric = "roc_auc")
+autoplot(chi_models, metric = "roc_auc")
+
+
+
+
+```
+
+# Pousser le meilleur modèle dans le workflow puis faire la prédiction avec
+
+```{r}
+
+splines_log_results <- 
+  chi_models %>% 
+  pull_workflow_set_result("splines_log")
+splines_log_results
+
+splines_log_workflow <- 
+  chi_models %>% 
+  pull_workflow("splines_log")
+splines_log_workflow
+
+
+splines_log_fit <- 
+  splines_log_workflow %>% 
+  finalize_workflow(tibble(prod_degree = 1)) %>% 
+  fit(data = ames_train)
+splines_log_fit
+
+ames_test %>% 
+  bind_cols(predict(splines_log_fit, ames_test, type='prob'))
+```
+
+## TO DO LIST
+More and more models
+# https://www.tmwr.org/workflow-sets.html
+lasso
+# https://juliasilge.com/blog/lasso-the-office/ 
+
+## essaie d'inclure tune_grid dans workflow_map (seulement tuning le modèle, sans tuning la recette)
+# https://www.tidyverse.org/blog/2021/03/workflowsets-0-0-1/
+
+# (https://workflowsets.tidymodels.org/reference/workflow_map.html)
+
+# (https://tune.tidymodels.org/reference/tune_grid.html)
