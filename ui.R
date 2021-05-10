@@ -11,6 +11,7 @@ library(shinydashboard)
 library(DT)
 library(leaflet)
 library(tidyverse)
+library(mapview)
 
 
 # Data Preparation 
@@ -28,6 +29,12 @@ caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFa
 # A réextraire à partir de la population entière.
 Departements <- caracteristiques.2019 %>% select(dep) %>% distinct 
 
+mapviewOptions(
+    basemaps = c("Esri.WorldShadedRelief", "OpenStreetMap.DE"),
+    raster.palette = grey.colors,
+    vector.palette = colorRampPalette(c("snow", "cornflowerblue", "grey10")),
+    na.color = "magenta",
+    layers.control.pos = "topright")
 
 
 # Define UI for application that draws a histogram
@@ -73,9 +80,9 @@ ui <- dashboardPage(
             ),
             
             tabItem(tabName = 'tab_map', class = "active",
-                    selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
-                    selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
-                    leafletOutput(outputId = "fr_map")
+                    # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
+                    # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
+                    mapviewOutput(outputId = "fr_map", width = "100%", height = 1000)
             )
         )
     )

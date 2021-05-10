@@ -9,16 +9,21 @@ library(shiny)
 library(shinyalert)
 library(shinydashboard)
 library(DT)
-library(tigris)
 library(leaflet)
 library(tidyverse)
 library(jsonlite)
+library(mapview)
+
 
 #Chargement Data - Filtrage####
 caracteristiques.2016 <- read.csv2("data/caracteristiques_2016.csv", sep=',', stringsAsFactors=TRUE)
 caracteristiques.2017 <- read.csv2("data/caracteristiques-2017.csv", sep=',', stringsAsFactors=TRUE)
 caracteristiques.2018 <- read.csv2("data/caracteristiques-2018.csv", sep=',', stringsAsFactors=TRUE)
+
 caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
+lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
+vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
+usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
 
 # Départements
 filtre_dep_lat_long_an <- function(tbl1) {
@@ -120,6 +125,45 @@ caracteristiques.filtre <- bind_rows(caracteristiques.2016.filtre, caracteristiq
 # Selection des données de l'année. A retravailler pour faire une sélection groupée / fusionnée.
 # caracteristiques.filtre <- caracteristiques.2016.filtre
 
+## Visualisation de la gravité par département ####
+acc_place_19 <- inner_join(caracteristiques.2019.filtre,lieux.2019,by=c("Num_Acc"="Num_Acc"));
+
+user_car_19<- inner_join(vehicules.2019,usagers.2019,by=c("Num_Acc"="Num_Acc", "id_vehicule" = "id_vehicule", "num_veh" = "num_veh"));
+
+total_19 <- inner_join(acc_place_19,user_car_19,by=c("Num_Acc"="Num_Acc"));
+
+gravity <- total_19%>% 
+    # filter(!is.na(grav)) %>%
+    mutate(grav_or_not = 
+               case_when(
+                   grav == "2" | grav == "3" ~ "1",
+                   TRUE ~ "2"
+               )
+    ) %>% 
+    mutate(age = 2019-an_nais) %>% 
+    mutate(
+           sexe = as.factor(sexe),
+           trajet = as.factor(trajet),
+           # secu_or_not = as.factor(secu_or_not),
+           # secu_level = as.factor(secu_level),
+           dep = paste0('FR-', dep)
+    ) %>%
+    select(grav_or_not, sexe, age, trajet, lat, long, dep)
+
+## TMAP ###
+france <- ne_states(country = "France", returnclass = "sf") %>% 
+    filter(!name %in% c("Guyane française", "Martinique", "Guadeloupe", "La Réunion", "Mayotte"))
+
+fr_stat <- gravity %>% 
+    group_by(dep) %>% 
+    mutate(mean_age = mean(age, na.rm = TRUE)) %>% 
+    # mutate(mean_secu_or_not = mean(secu_or_not)) %>% 
+    select(mean_age, dep) %>% 
+    slice(1) %>% 
+    # left_join(france,by=c("dep"="iso_3166_2")) 
+
+
+
 #Server Logic####
 server <- function(input, output, session) {
     
@@ -144,11 +188,27 @@ server <- function(input, output, session) {
         caracteristiques.filtre %>% filter(an == input$annee_fr_map) %>% filter(dep == input$dep_fr_map)
     })
     
-    output$fr_map <- renderLeaflet({
-        # isolate(caracteristiques.2019.select)
-        leaflet() %>%
-            addTiles() %>%
-            addMarkers(lng=(caracteristiques.select())$long, lat=(caracteristiques.select())$lat , popup=(paste0(caracteristiques.select()$Num_Acc)))
-            })    
+    # output$fr_map <- renderLeaflet({
+    #     leaflet() %>%
+    #         addTiles() %>%
+    #         addMarkers(lng=(caracteristiques.select())$long, lat=(caracteristiques.select())$lat , popup=(paste0(caracteristiques.select()$Num_Acc)))
+    #         })    
+    
+    # output$fr_map <- renderTmap({
+    #     tm_basemap("Stamen.Watercolor") +
+    #         tm_shape(fr_stat) +
+    #         tm_fill(col = "mean_secu_or_not", palette = "Blues", alpha = 0.8) +
+    #         tm_borders("white", lwd = 1)
+    # })    
+    
+    output$fr_map <- renderMapview({
+        mapview(france,
+                zcol = "region",
+                legend = FALSE,
+                layer.name = "Departements",
+                # popup = leafpop::popupTable(france, zcol = c("name", "region"), feature.id = FALSE, row.numbers = FALSE)
+                popup = leafpop::popupTable(fr_stat)
+                )
+    })
     
 }
