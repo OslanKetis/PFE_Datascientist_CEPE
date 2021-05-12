@@ -10,11 +10,11 @@ library(tidyverse)
 # colnames(total_19)
 gravity <- total_19%>% 
   filter(!is.na(grav)) %>% 
-  filter(grepl("^75", dep)) %>% 
+  filter(grepl("^35", dep)) %>% 
   mutate(grav_or_not = 
         case_when(
         grav == "2" | grav == "3" ~ "1",
-        TRUE ~ "2"
+        TRUE ~ "0"
         )
   ) %>% 
   mutate(age = 2019-an_nais) %>% 
@@ -31,6 +31,8 @@ gravity %>% group_by(grav_or_not) %>%
   
 glimpse(gravity)
 colnames(total_19)
+
+
 
 ```
 
@@ -78,10 +80,31 @@ ames_rec_prepped <- prep(ames_rec) # si je met pas de parametre data, il va pren
 
 matrice_design <- bake(ames_rec_prepped, new_data = NULL)
 matrice_design
-dim(matrice_design)
-colnames(matrice_design)
 
 ```
+
+# Fabriquer matrice_design_test pour neural_network
+```{r}
+ames_rec_test <-
+  recipe(grav_or_not ~ ., data = ames_test) %>%
+#   step_other(UniqueCarrier, threshold = 0.01) %>%
+#   # step_mutate(DepDelay = log(1-min(DepDelay)+DepDelay))%>%
+#   step_mutate(DepDelay=log(1-min(DepDelay)+DepDelay))%>%
+  step_dummy(all_nominal(), -grav_or_not)
+  # %>%
+#   step_interact( ~ DepDelay:starts_with("UniqueCarrier_") ) %>%
+#   step_ns(DepDelay, deg_free = 20)
+
+# ces lignes de code dessous pour visualiser la design matrice
+ames_rec_prepped_test <- prep(ames_rec_test) # si je met pas de parametre data, il va prendre le meme que la recette
+
+# hf_train_prepped <-  bake(ames_rec_prepped, new_data = NULL) # cest notre matrice_design
+# hf_test_prepped <- bake(ames_rec_prepped, new_data = ames_test)
+
+matrice_design_test <- bake(ames_rec_prepped_test, new_data = NULL)
+matrice_design_test
+```
+
 
 ## Definition des modèles
 # https://parsnip.tidymodels.org/reference/
@@ -360,7 +383,139 @@ xgboost_model_tune <-
   ) %>%
   set_engine("xgboost", objective = "reg:squarederror")
 
+mars_spec_tune <- 
+   mars(prod_degree = tune()) %>%  #<- use GCV to choose terms
+   set_engine("earth") %>% 
+   set_mode("classification")
+
+svm_r_spec_tune <- 
+   svm_rbf(cost = tune(), rbf_sigma = tune()) %>% 
+   set_engine("kernlab") %>% 
+   set_mode("classification")
+
+svm_p_spec_tune <- 
+   svm_poly(cost = tune(), degree = tune()) %>% 
+   set_engine("kernlab") %>% 
+   set_mode("classification")
+
+library(rules)
+cubist_spec_tune <- 
+   cubist_rules(committees = tune(), neighbors = tune()) %>% 
+   set_engine("Cubist")
+
+knn_spec_tune <- 
+   nearest_neighbor(neighbors = tune(), dist_power = tune(), weight_func = tune()) %>% 
+   set_engine("kknn") %>% 
+   set_mode("classification")
+
+cart_spec_tune <- 
+   decision_tree(cost_complexity = tune(), min_n = tune()) %>% 
+   set_engine("rpart") %>% 
+   set_mode("classification")
+
+
+library(baguette)
+tidymodels_prefer()
+bag_cart_spec <- 
+   bag_tree() %>% 
+   set_engine("rpart", times = 50L) %>% 
+   set_mode("classification")
+
+
+nnet_spec_tune <- 
+   mlp(hidden_units = tune(), penalty = tune(), epochs = tune()) %>% 
+   set_engine("nnet", MaxNWts = 2600) %>% 
+   set_mode("classification")
+
+nnet_param <- 
+   nnet_spec_tune %>% 
+   parameters() %>% 
+   update(hidden_units = hidden_units(c(1, 27)))
+
+
+
+
 ```
+
+```{r}
+# normalized <- 
+#    workflow_set(
+#       preproc = list(basic = ames_rec), 
+#       models = list(#SVM_radial = svm_r_spec_tune, 
+#                     #SVM_poly = svm_p_spec_tune, 
+#                     KNN = knn_spec_tune, 
+#                     neural_network = nnet_spec_tune)
+#    )
+# 
+# 
+# 
+# normalized %>% pull_workflow(id = "basic_neural_network")
+# 
+# normalized <- 
+#    normalized %>% 
+#    option_add(param = nnet_param, id = "basic_neural_network")
+# normalized
+# 
+# all_workflows <- 
+#    bind_rows(normalized) %>% 
+#    # Make the workflow ID's a little more simple: 
+#    mutate(wflow_id = gsub("(simple_)|(normalized_)", "", wflow_id))
+# all_workflows
+# 
+# grid_ctrl <-
+#    control_grid(
+#       save_pred = TRUE,
+#       parallel_over = "everything",
+#       save_workflow = TRUE
+#    )
+# 
+# grid_results <-
+#    all_workflows %>%
+#    workflow_map(
+#       seed = 1503,
+#       resamples = ames_resampling,
+#       metrics = metric_set(accuracy, roc_auc, pr_auc), 
+#       grid = 25,# grid search is applied to each workflow using up to 25 different parameter candidates donc 25 models 
+#       control = grid_ctrl
+#    )
+
+# grid_ctrl <-
+#    control_grid(
+#       save_pred = TRUE,
+#       parallel_over = "everything",
+#       save_workflow = TRUE
+#    )
+# 
+# full_results_time <- 
+#    system.time(
+#       grid_results <- 
+#          all_workflows %>% 
+#          workflow_map(seed = 1503, resamples = ames_resampling, grid = 25, 
+#                       control = grid_ctrl, verbose = TRUE) 
+#    )
+
+# num_grid_models <- nrow(collect_metrics(grid_results, summarize = FALSE))
+# num_grid_models
+# grid_results
+# 
+# grid_results %>% 
+#    rank_results() %>% 
+#    filter(.metric == "pr_auc") %>% 
+#    select(model, .config, roc_auc = mean, rank)
+# 
+# 
+# 
+# autoplot(
+#    grid_results,
+#    rank_metric = "pr_auc",  # <- how to order models
+#    metric = "pr_auc",       # <- which metric to visualize
+#    select_best = TRUE     # <- one point per workflow
+# )
+# 
+# collect_metrics(grid_results)
+
+```
+
 
 # Tuning le recette
 
@@ -416,6 +571,7 @@ xgboost_tuned %>%
 ```
 
 # Cas 2 : Tuning recette, ne pas tuning les modèles, travailler avec workflow
+# https://www.tidyverse.org/blog/2021/03/workflowsets-0-0-1/
 
 ```{r}
 preproc <- 
@@ -501,21 +657,28 @@ log_Spline_tune %>%
 # selon la dernier commande degree 3 est legerement mieux
 ```
 
-# Cas 3 : Tuning les modèles mais ne pas tuning la recette. Puis pousser directement la meilleure modèle dans workflow pour prédire. 
+# Cas 3 : Tuning les modèles mais ne pas tuning la recette. Puis pousser directement la meilleure modèle dans workflow pour prédire. https://github.com/tidymodels/workflowsets/blob/main/vignettes/articles/tuning-and-comparing-models.Rmd
+
 
 
 ```{r}
-chi_models
 
 
 chi_models <- 
    workflow_set(
-      preproc = list( #basic = ames_rec, 
-                      #interact = interaction_rec, 
-                      splines = spline_rec),
-      models = list(log = log_model,
-                    #rf=rf_model,
-                    bt_tune=xgboost_model_tune),
+      preproc = list( basic = ames_rec, 
+                      #interact = interaction_rec,
+                      spline_tune = spline_rec_tune
+                      #splines = spline_rec
+                      ),
+      models =list(log = log_model,
+                   # rf=rf_model,
+                   # bt =xgboost_model_tune,
+                   # SVM_radial = svm_r_spec_tune, 
+                   # SVM_poly = svm_p_spec_tune, 
+                   # KNN = knn_spec_tune, 
+                   neural_network = nnet_spec_tune
+                  ),
       cross = TRUE
    )
 chi_models
@@ -534,17 +697,137 @@ chi_models <-
                control = keep_pred)
 
 
-rank_results(chi_models, rank_metric = "roc_auc")
-autoplot(chi_models, metric = "roc_auc")
+```
+
+# Ranking, trouver le meilleur modèle selon metric
+```{r}
+rank_results(chi_models, rank_metric = "roc_auc")  # splines_neural_network est classe en 1er, donc renseigner dans loption de best_results
 
 
 
+# autoplot(chi_models, metric = "roc_auc")
+autoplot(
+   chi_models,
+   rank_metric = "roc_auc",  # <- how to order models
+   metric = "roc_auc",       # <- which metric to visualize
+   select_best = TRUE     # <- one point per workflow
+)
 
+rank_results(chi_models, rank_metric = "roc_auc") %>% group_by(model,wflow_id) %>% summarise(n=n())
 ```
 
 # Pousser le meilleur modèle dans le workflow puis faire la prédiction avec
 
+# Pousser le modèle NN puis faire la prédiction
 ```{r}
+################### Pousser neural_network ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_neural_network") %>% 
+   select_best(metric = "roc_auc")
+
+best_results
+
+
+neural_network_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_neural_network") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+neural_network_test_results %>% 
+   collect_predictions()
+
+################### Pousser KNN ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_KNN") %>% 
+   select_best(metric = "roc_auc")
+best_results
+
+
+KNN_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_KNN") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+KNN_test_results %>% 
+   collect_predictions()
+
+################### Pousser splines_SVM_poly ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_SVM_poly") %>% 
+   select_best(metric = "roc_auc")
+best_results
+
+
+Boosting_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_SVM_poly") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+Boosting_test_results %>% 
+   collect_predictions()
+
+################### Pousser splines_SVM_radial ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_SVM_radial") %>% 
+   select_best(metric = "roc_auc")
+best_results
+
+
+Boosting_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_SVM_radial") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+Boosting_test_results %>% 
+   collect_predictions()
+
+
+
+################### Pousser boosting ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_bt") %>% 
+   select_best(metric = "roc_auc")
+best_results
+
+
+Boosting_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_bt") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+Boosting_test_results %>% 
+   collect_predictions()
+
+
+################### Pousser RF ###########################
+best_results <- 
+   chi_models %>% 
+   pull_workflow_set_result("splines_rf") %>% 
+   select_best(metric = "roc_auc")
+best_results
+
+
+Boosting_test_results <- 
+   chi_models %>% 
+   pull_workflow("splines_rf") %>% 
+   finalize_workflow(best_results) %>% 
+   last_fit(split = ames_split)
+
+Boosting_test_results %>% 
+   collect_predictions()
+
+
+################### Pousser log ###########################
 
 splines_log_results <- 
   chi_models %>% 
