@@ -9,65 +9,235 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
 
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
+
 
 # importation des données
-```{r}
-caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
 
-lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
+
+## variables a supprimer
+
+-voie, -v1, -v2, -pr, -pr1, -lartpc, -larrout, -adr, -occutc |Num_Acc, id_vehicule, num_veh, 
+
+## variables quanti a isoler
+lat,long
+
+## valeurs manquant
+```{r}
+caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv")
+caracteristiques.2019 %>% group_by(dep) %>% select(dep) %>% summarise(n=n())
+caracteristiques.2019 <- caracteristiques.2019 %>% select(-adr) %>% mutate_at(vars(-("Num_Acc"), -("long"), -("lat"),-("dep")) ,as.factor) %>% mutate(Hour=str_sub(hrmn, 1, 2))  
+
+caracteristiques.2019 %>% group_by(dep)
+
+lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";")
+lieux.2019 <- lieux.2019 %>% select(-voie, -v1, -v2, -pr, -pr1, -lartpc, -larrout) %>%  mutate_at(vars(-("Num_Acc"), ),as.factor)
 
 vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
+vehicules.2019 <-vehicules.2019 %>% select(-occutc, -senc) %>% mutate_at(vars(-("Num_Acc"),-("id_vehicule"), -("num_veh")),as.factor)
 
 usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
+usagers.2019 <- usagers.2019 %>% mutate_at(vars(-("Num_Acc"),-("id_vehicule"), -("num_veh"), -("an_nais") ),as.factor)
 
+usagers.2019 <- usagers.2019 %>% 
+  # mutate(actp = 
+  #       case_when(
+  #       actp == "A" ~ 10,
+  #       actp == "B" ~ 11,
+  #       TRUE~as.numeric(actp)
+  #       )
+  # ) %>% 
+  
+  mutate(age = 2019-an_nais) %>%
+  mutate(secu_or_not = (secu1 %in% c("1", "2","3","4","5", "6","7")) | (secu2 %in% c("1", "2","3","4","5", "6","7")) | (secu3 %in% c("1", "2","3","4","5", "6","7")), secu_level = (secu1 %in% c("1", "2","3","4","5", "6","7")) + (secu2 %in% c("1", "2","3","4","5", "6","7")) + (secu3 %in% c("1", "2","3","4","5", "6","7"))) %>% 
+  mutate(secu_or_not = as.factor(secu_or_not))
 
-View(caracteristiques.2019)
-colnames(caracteristiques.2019)
-str(caracteristiques.2019)
 
 ```
 
-# creation de variables de securite
-## secu_or_not : s'il y a au moins une équipement de securité
-## secu_level : nb d'équipements de sécurité
+
+# visualisation de nom de variables
 ```{r}
-usagers.2019 <- usagers.2019 %>% mutate(secu_or_not = (secu1 %in% c("1", "2","3","4","5", "6","7")) | (secu2 %in% c("1", "2","3","4","5", "6","7")) | (secu3 %in% c("1", "2","3","4","5", "6","7")), secu_level = (secu1 %in% c("1", "2","3","4","5", "6","7")) + (secu2 %in% c("1", "2","3","4","5", "6","7")) + (secu3 %in% c("1", "2","3","4","5", "6","7")))
+cat('caracteristics: ', colnames(caracteristiques.2019), '\n')
+cat('places: ', colnames(lieux.2019), '\n')
+cat('users: ', colnames(usagers.2019), '\n')
+cat('vehicles: ', colnames(vehicules.2019))
+```
 
 
-grav <- usagers.2019 %>% group_by(grav) %>% summarise(total=n())
-grav_secu <- 
-inner_join(usagers.2019 %>% filter(grav !=1) %>%  group_by(grav, secu_or_not) %>% summarise(n=n()), grav, by = "grav") %>% mutate(pourcentage = n/total) %>% mutate(lab_ypos = cumsum(n))
-lab_ypos_2 = c(3498, 1391, 20858, 6240, 53307, 12878)
-c <- cbind(grav_secu, lab_ypos_2)
-
-colnames(c) <- c("grav",        "secu_or_not", "n",           "total"   ,  
-"pourcentage", "lab_ypos",    "lab_ypos2") 
+```{r}
+cat('caracteristics: ', nrow(caracteristiques.2019), '\n')
+cat('places: ', nrow(lieux.2019), '\n')
+cat('users: ', nrow(usagers.2019), '\n')
+cat('vehicles: ', nrow(vehicules.2019))
+```
 
 
-library(ggplot2)
-ggplot(data = c, aes(x = grav, y = n)) +
-  geom_col(aes(fill = secu_or_not), width = 0.7)+
-  geom_text(aes(y = lab_ypos2/1.2, label = round(pourcentage, digits = 2), group =secu_or_not), color = "white")
+
+## creation de variables de securite
+# secu_or_not : s'il y a au moins une équipement de securité
+# secu_level : nb d'équipements de sécurité
+# gestion actp modalité A et B
+
+```{r}
+
+
+
 
 ```
+
+# Recodage
+
+```{r}
+levels(caracteristiques.2019$lum)
+levels(caracteristiques.2019$lum) = factor(c("1", "2", "3", "3", "2"))
+levels(caracteristiques.2019$lum)
+
+```
+
+```{r}
+levels(caracteristiques.2019$atm)
+
+levels(caracteristiques.2019$atm) = factor(c("4", "1", "2", "3", "3","3","3", "2", "2", "4"))
+levels(caracteristiques.2019$atm)
+
+```
+
+catr : 1 = voie rapide 2 = voie en ville ou commune 3 = autre
+```{r}
+levels(lieux.2019$catr)
+levels(lieux.2019$catr) = factor(c("1", "1", "1", "2", "3","3", "2","3"))
+levels(lieux.2019$catr)
+```
+
+
+"0" = autre "1" = normal "2" = eau "3" = verglacée 
+```{r}
+levels(lieux.2019$surf)
+levels(lieux.2019$surf) = factor(c("0", "1", "2", "2", "2","2", "2", "3", "2","0"))
+levels(lieux.2019$surf)
+```
+
+```{r}
+levels(vehicules.2019$manv)
+levels(vehicules.2019$manv) = factor(c("7","7", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1","2","2","3","3","4","4","5","5","6","6","6","6","6","6","6","6"))
+
+```
+
+
+# place : 1= devant, 2= milieu, 3= derrier
+```{r}
+
+levels(usagers.2019$place)
+levels(usagers.2019$place) = factor(c("1","1", "3", "3", "3", "1", "2", "2", "2", "2"))
+
+
+
+```
+
+# trajet
+```{r}
+levels(usagers.2019$trajet)
+levels(usagers.2019$trajet) = factor(c("9","9", "1", "2", "3", "4", "5", "9"))
+
+```
+# actp
+```{r}
+levels(usagers.2019$actp)
+levels(usagers.2019$actp) = factor(c("5","5", "1", "2", "3", "3", "3", "3", "5",   "5",   "5",   "4",   "4"))
+```
+
 
 # jointure des tables
 ## il suffit d'utiliser inner join car les tables se correspondent
 
 ```{r}
-library(tidyverse)
-acc_place_19 <- inner_join(caracteristiques.2019,lieux.2019,by=c("Num_Acc"="Num_Acc"));
+
+total_accidents_19 <- inner_join(caracteristiques.2019,lieux.2019,by=c("Num_Acc"="Num_Acc"));
 
 user_car_19<- inner_join(vehicules.2019,usagers.2019,by=c("Num_Acc"="Num_Acc", "id_vehicule" = "id_vehicule", "num_veh" = "num_veh"));
 
-total_19 <- inner_join(acc_place_19,user_car_19,by=c("Num_Acc"="Num_Acc"));
+total_19 <- inner_join(total_accidents_19,user_car_19,by=c("Num_Acc"="Num_Acc"));
+total_19
+
+levels(total_19$place)
+```
+
+
+
+
+```{r}
+usagers.2019 %>% group_by(trajet) %>% summarise(n=n())
+usagers.2019
+```
+
+
+## variables a supprimer
+-Num_Acc, -id_vehicule, -num_veh, -com, -hrmn, -an, -an_nais, -grav, -secu1, secu2, secu3
+```{r}
+gravity <- 
+  total_19 %>% 
+    filter(!is.na(grav)) %>% 
+    filter(grepl("^35", dep) | grepl("^53", dep)) %>% 
+
+    mutate(grav_or_not = 
+          case_when(
+          grav == "2" | grav == "3" ~ "1",
+          TRUE ~ "0"
+          )
+    ) %>% 
+    mutate(secu_or_not = 
+          case_when(
+          secu_or_not == "FALSE"  ~ "0",
+          TRUE ~ "1"
+          )
+    ) %>% 
+     
+  mutate_at(vars(-("lat"),-("long"), -("age") ), as.factor) %>% 
+  # select(mois, lum, dep, agg, lat, long, manv, motor, place, catu, locp, actp, etatp, grav_or_not, sexe, trajet, secu_or_not, secu_level, catv, obs, obsm, choc, age, vma, situ, infra, plan, prof, vosp, nbv,circ, catr, col, atm,int ,  Hour, surf, jour )
+  select( -Num_Acc, -id_vehicule, -num_veh, -com, -hrmn, -an, -an_nais, -grav, -secu1, -secu2, -secu3)
+
+dim(gravity)
+glimpse(gravity)
+colnames(gravity)
+
+
+
+
+# gravity %>%  filter(is.na(long))
+```
+
+```{r}
 
 ```
+
+
+## Stat par département
+```{r}
+
+levels(gravity$place)
+
+nb_by_dep <-  gravity %>% group_by(dep) %>% summarise(total_dep=n()) 
+t1 <- gravity %>% group_by(dep, plan, place, lum) %>% summarise(n=n()) %>% arrange(dep) %>% inner_join(nb_by_dep, by=c("dep"="dep"))
+
+t1
+t1 %>% mutate(rate=n/total_dep) %>% select(-n,-total_dep)%>% 
+  pivot_wider(names_from = c(place, plan, lum), values_from = rate, names_glue = "rate_{place}_{plan}_{lum}"
+  )
+
+
+
+gravity %>% select(-lat,-long) %>% group_by_all()%>% summarise(n=n())
+# gravity %>% group_by_all(-lat, -long) %>% summarise(n=n())
+
+
+
+```
+
+
 
 # Geolocalisation pour les accidents du département 59 en 2019. Trop consommant si on ne filter pas un seul departement
 
@@ -80,14 +250,3 @@ m <- leaflet() %>%
   addMarkers(lng=caracteristiques.2019.59$long, lat=caracteristiques.2019.59$lat , popup=caracteristiques.2019.59$adr)
 m  
 ```
-
-# stat desc
-```{r}
-total_19 %>% summarise()
-colnames(total_19)
-```
-```{r}
-total_19 %>% summarise()
-colnames(total_19)
-```
-

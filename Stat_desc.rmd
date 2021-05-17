@@ -1,0 +1,226 @@
+---
+title: "Stat desc"
+output: html_notebook
+---
+
+
+https://www.kaggle.com/alexandrekhoury/kernel76317d436f
+```{r}
+plot(cars)
+library(tidyverse)
+library(ggthemes)
+library(scales)
+library(mice)
+library(corrplot)
+Sys.setlocale('LC_ALL','C') # Nécessaire sinon bug
+```
+
+```{r}
+# caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv")
+# 
+# caracteristiques.2019 <- caracteristiques.2019 %>% select(-adr) 
+# 
+# 
+# 
+# lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";")
+# lieux.2019 <- lieux.2019 %>% select(-voie, -v1, -v2, -pr, -pr1, -lartpc, -larrout)
+# 
+# vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
+# vehicules.2019 <-vehicules.2019 %>% select(-occutc, -senc)
+# 
+# usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
+# 
+# total_accidents_19 <- inner_join(caracteristiques.2019,lieux.2019,by=c("Num_Acc"="Num_Acc")) %>% mutate(grav_or_not = 
+#           case_when(
+#           grav == "2" | grav == "3" ~ "1",
+#           TRUE ~ "0"
+#           )
+#     ) %>% 
+#     mutate(secu_or_not = 
+#           case_when(
+#           secu_or_not == "FALSE"  ~ "0",
+#           TRUE ~ "1"
+#           )
+#     )  ;
+
+
+```
+
+
+
+# Premier aperçu, analyse par mois
+
+```{r}
+
+lesMois <- c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre')
+
+nombreDeJoursParMois <- c(31,29,31,30,31,30,31,31,30,31,30,31)
+# nombreDannees = 2019-2005+1 # changerai si on integre plusieurs annees
+nombreDannees = 1
+resultat <- vector()
+for(i in 1:12){
+    nombreDaccidents <- nrow(filter(caracteristiques.2019, mois==i))
+    nombreDeJoursAuTotal <- nombreDeJoursParMois[i]*nombreDannees
+    # if(i==2){
+    #     nombreDeJoursAuTotal <- nombreDeJoursAuTotal+3 # 2008, 2012, et 2016 sont bisextiles! Donc un jour de plus en fevrier
+    # }
+    x <- nombreDaccidents/nombreDannees
+    resultat <- c(resultat,x)
+}
+barplot(height=resultat, names.arg=lesMois,main="Nombre d'accidents par mois",las=2)
+
+
+
+```
+
+
+# le nombre d'accidents par jour pour chaque mois
+```{r}
+for(i in 1:12){
+    resultat[i] <- resultat[i]/nombreDeJoursParMois[i]
+}
+# resultat[2] <- resultat[2]*28*nombreDannees/(nombreDannees*28+3) # Toujours pour les années bissextiles
+barplot(height=resultat, names.arg=lesMois,main="Nombre d'accidents par jour pour chaque mois",las=2)
+
+```
+
+Deux idées d'interprétation du résultat:
+
+    * Les gens sont plus prudents en hiver, donc moins d'accidents
+    * Les gens sont en voyage ou en vacance chez eux en juillet/août, et donc moins de voiture sur la route Évidemment, on n'écarte pas la possibilité d'erreur dans les données, ou d'erreur dans notre code. Ce résultat est important! Car ce genre d'information peut aider la population à mieux comprendre les risques et peut-être éviter les pièges.
+
+
+# Analyse par heure
+```{r}
+
+
+caracteristiques.2019 <- caracteristiques.2019 %>% mutate(hh = str_sub(hrmn, 1, 2))
+
+counts <- table(caracteristiques.2019$hh)
+barplot(counts, main="Nombre d'accidents par heure", xlab="Heure")
+
+
+```
+
+Il faudrait croiser ces données avec une table sur le nombre de voitures sur les routes en fonction de l'heure
+
+
+
+# Analyse des cas mortels
+
+
+Nous décidons de refaire les 3 études, mais cette fois en comptant le nombre de personnes gravement blessées ou décédées. D'après la documentation, ce sont les personnes pour qui grav vaut 2 ou 3 dans la table users. Il faut donc fusionner les tables users et caracteristics afin d'avoir accès aux dates.
+
+
+```{r}
+gravite <- merge(caracteristiques.2019,usagers.2019,by="Num_Acc")
+gravite <- filter(gravite, grav==2 | grav==3)
+
+
+
+#Par mois
+resultat <- vector()
+for(i in 1:12){
+    nombreDaccidents <- nrow(filter(gravite, mois==i))
+    nombreDeJoursAuTotal <- nombreDeJoursParMois[i]*nombreDannees
+    # if(i==2){
+    #     nombreDeJoursAuTotal <- nombreDeJoursAuTotal+3
+    # }
+    x <- nombreDaccidents/nombreDannees
+    resultat <- c(resultat,x)
+}
+barplot(height=resultat, names.arg=lesMois,main="Nombre de morts/blesses par mois",las=2)
+
+#Par jour pour chaque mois
+for(i in 1:12){
+    resultat[i] <- resultat[i]/nombreDeJoursParMois[i]
+}
+# resultat[2] <- resultat[2]*28*nombreDannees/(nombreDannees*28+3) # Toujours pour les années bissextiles
+barplot(height=resultat, names.arg=lesMois,main="Nombre de morts/blesses par jour pour chaque mois",las=2)
+
+#Par heure
+gravite = transform(gravite, hh = str_sub(hrmn, 1, 2))
+counts <- table(gravite$hh)
+barplot(counts, main="Nombre de morts/blesses par heure", xlab="Heure")
+
+```
+
+
+Réalisons dès à présent une matrice de corrélation pour mieux voir la situation des tables: total_accidents, users, et vehicles. Il faut d'abord enlever les colonnes textuelles (comme l'adresse).
+
+
+```{r}
+
+total_accidents_19.corplot <- total_accidents_19 %>% mutate_at(vars(-("Num_Acc"), -("long"), -("lat"),-("dep")) ,as.numeric) %>% select(-Num_Acc, -an)
+
+nums <- unlist(lapply(total_accidents_19.corplot, is.numeric)) # Technique pour ne garder que les colonnes numériques
+nums
+# nums <- nums[-4]
+
+corrplot(cor(total_accidents_19.corplot[,nums],use="pairwise.complete.obs"),type = "upper",mar=c(0,0,0,0))
+
+
+```
+
+
+
+total_accidents_19 :  On observe une corrélation entre 'agg' et 'catr', c'est-à-dire entre le fait qu'on est en agglomération ou pas et le type de route, ce qui semble cohérent. Pareil pour 'circ' (rue à sens unique, ou double sens) et 'nbv' (nombre de voies). On voit également une corrélation entre 'an' avec 'lat' (Latitude), l'explication possible pourrait être qu'à partir d'une certaine année, ils ont décider de stocker la latitude (à vérifier). Corrélation entre 'Num_Acc' et 'an' toute à fait logique, car Num_Acc est croissant au fil du temps. Corrélation entre 'atm' (conditions atmosphériques) et 'surf' (condition sec/mouillé du sol) logique. Corrélation entre 'nbv' (nombre de voies) et 'larrout' (largeur de la route) logique.
+
+
+
+```{r}
+
+usagers.2019.corplot <- usagers.2019 %>% mutate_at(vars(-("Num_Acc"),-("id_vehicule"), -("num_veh"), -("an_nais") ),as.numeric) %>% select(-secu1, -secu2, -secu3, -Num_Acc, -an_nais)
+nums <- unlist(lapply(usagers.2019.corplot, is.numeric))
+nums
+corrplot(cor(usagers.2019.corplot[,nums],use="pairwise.complete.obs"),type = "upper",mar=c(0,0,0,0))
+
+
+
+
+```
+
+
+usagers.2019 : On remarque que 'actp', 'etatp', et 'locp' sont corrélés, ce qui semble logique car ce sont 3 variables qui décrivent la situation du/des passant(s). Mais le résultat le plus intéréssant de notre étude est la corrélation entre 'grav' (la gravité de l'accident) et 'secu' (le port de casque, ou de ceinture de sécurité) ! C'est un résultat connu, mais nous l'avons ici retrouvé.
+
+```{r}
+vehicules.2019.corplot <- vehicules.2019 %>% mutate_at(vars(-("Num_Acc"),-("id_vehicule"), -("num_veh")),as.numeric) %>% select(-Num_Acc)
+
+nums <- unlist(lapply(vehicules.2019.corplot, is.numeric))
+nums
+corrplot(cor(vehicules.2019.corplot[,nums],use="pairwise.complete.obs"),type = "upper",mar=c(0,0,0,0))
+```
+
+
+3) Il y a une corrélation entre 'choc' (le point de choc sur la voiture) et 'manv' (le type de manoeuvre qui a été faite juste avant l'accident), ce qui est cohérent.
+
+
+```{r}
+# usagers.2019 <- usagers.2019 %>% 
+#   mutate(actp = 
+#         case_when(
+#         actp == "A" ~ 10,
+#         actp == "B" ~ 11,
+#         TRUE~as.numeric(actp)
+#         )
+#   ) %>% 
+#   mutate(secu_or_not = (secu1 %in% c("1", "2","3","4","5", "6","7")) | (secu2 %in% c("1", "2","3","4","5", "6","7")) | (secu3 %in% c("1", "2","3","4","5", "6","7")), secu_level = (secu1 %in% c("1", "2","3","4","5", "6","7")) + (secu2 %in% c("1", "2","3","4","5", "6","7")) + (secu3 %in% c("1", "2","3","4","5", "6","7"))) %>% 
+#   mutate(secu_or_not = as.factor(secu_or_not))
+
+grav <- usagers.2019 %>% group_by(grav) %>% summarise(total=n())
+
+grav_secu <- 
+inner_join(usagers.2019 %>% filter(grav !=1) %>%  group_by(grav, secu_or_not) %>% summarise(n=n()), grav, by = "grav") %>% mutate(pourcentage = n/total) %>% mutate(lab_ypos = cumsum(n))
+lab_ypos_2 = c(3498, 1391, 20858, 6240, 53307, 12878)
+c <- cbind(grav_secu, lab_ypos_2)
+
+colnames(c) <- c("grav",        "secu_or_not", "n",           "total"   ,  
+"pourcentage", "lab_ypos",    "lab_ypos2") 
+
+
+library(ggplot2)
+ggplot(data = c, aes(x = grav, y = n)) +
+  geom_col(aes(fill = secu_or_not), width = 0.7)+
+  geom_text(aes(y = lab_ypos2/1.2, label = round(pourcentage, digits = 2), group =secu_or_not), color = "white")
+```
+
