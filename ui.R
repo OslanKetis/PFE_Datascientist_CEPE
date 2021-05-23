@@ -12,22 +12,15 @@ library(DT)
 library(leaflet)
 library(tidyverse)
 library(mapview)
+library(rnaturalearth)
+library(rgeos)
 
-
-# Data Preparation 
-
-
-# load .csv dataset
-caracteristiques.2019 <- read.csv2("data/caracteristiques-2019.csv", stringsAsFactors=TRUE)
-
-# lieux.2019 <- read.csv2("data/lieux-2019.csv", sep=";", stringsAsFactors=TRUE)
-
-# vehicules.2019 <- read.csv("data/vehicules-2019.csv", sep=";")
-
-# usagers.2019 <- read.csv("data/usagers-2019.csv", sep=";")
+# Data Preparation - Nettoyoge
+if(!exists("foo", mode="function")) source("nettoyage.R")
 
 # A réextraire à partir de la population entière.
 Departements <- caracteristiques.2019 %>% select(dep) %>% distinct 
+Criteres <- c("age","gravite")
 
 mapviewOptions(
     basemaps = c("Esri.WorldShadedRelief", "OpenStreetMap.DE"),
@@ -39,7 +32,7 @@ mapviewOptions(
 
 # Define UI for application that draws a histogram
 ui <- dashboardPage(
-    header = dashboardHeader(title = 'Etude Accidents de la route corporel 2017 - 2019'), 
+    header = dashboardHeader(title = 'Accidents corporels 2017 - 2019'), 
     sidebar = dashboardSidebar(
         sidebarMenu(
             menuItem("Statistiques générales", tabName = "tab_general_statistics", icon = icon("car-crash")),
@@ -49,22 +42,55 @@ ui <- dashboardPage(
     ), 
     body = dashboardBody(
         tabItems(
+            # First tab content
             tabItem(tabName = "tab_general_statistics", class = "active",
                     fluidRow(
                         box(width = 6, background = 'blue',
-                            selectInput(inputId = "dep_selected", label = "Département sélectionné", choices = Departements)
+                            selectInput(inputId = "annee_selected", label = "Année", choices = c(2019,2018,2017,2016))
                         ),
-                        valueBoxOutput(outputId = "dep_selected_mini_info", width = 6)
+                        valueBoxOutput(outputId = "annee_selected_mini_info", width = 6)
                     ),
                     fluidRow(
-                        box(width = 12,
-                            DTOutput("general_statistics_by_dep")
+                        box(width = 6,
+                            plotOutput("plot_stats_per_month")
+                        ),
+                        box(width = 6,
+                            plotOutput("plot_stats_per_hour")
                         )
                     )
             ),
             
             # Second tab content
-            tabItem(tabName = "tab_dep_comparaison", class = "active",
+            tabItem(tabName = 'tab_dep_comparaison', class = "active",
+                    fluidRow(
+                        box(
+                            selectInput(inputId = "dep_selected_1", label = "Département 1", choices = Departements)
+                        ),
+                        box(
+                            selectInput(inputId = "dep_selected_2", label = "Département 2", choices = Departements)
+                        )
+                    ),
+                    fluidRow(
+                        box(
+                            selectInput(inputId = "critere", label = "Critère de comparaison", choices = Criteres)
+                        )
+                    ),
+                    fluidRow(
+                        box(
+                            # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
+                            # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
+                            mapviewOutput(outputId = "fr_map_1", width = "100%", height = 600)
+                        ),
+                        box(
+                            # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
+                            # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
+                            mapviewOutput(outputId = "fr_map_2", width = "100%", height = 600)
+                        )
+                    )
+            ),
+            
+            # Third tab content
+            tabItem(tabName = "tab_map", class = "active",
                     fluidRow(
                         useShinyalert(),
                         box(
@@ -77,12 +103,6 @@ ui <- dashboardPage(
                         ), 
                         plotOutput(outputId = "plot_comparison_indicator_between_states")
                     )
-            ),
-            
-            tabItem(tabName = 'tab_map', class = "active",
-                    # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
-                    # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
-                    mapviewOutput(outputId = "fr_map", width = "100%", height = 1000)
             )
         )
     )
