@@ -1,4 +1,5 @@
 ## Nettoyage des donées pour affichage shiny
+library(tidyverse)
 
 #Chargement Data - Filtrage####
 caracteristiques.2016 <- read.csv2("data/caracteristiques_2016.csv", sep=',', stringsAsFactors=TRUE)

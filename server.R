@@ -15,14 +15,17 @@ library(jsonlite)
 library(mapview)
 library(rnaturalearth)
 library(tmap)
+library(ggplot2)
+library(extrafont)
 tmap_mode(mode = "view")
 
 
 if(!exists("foo", mode="function")) source("nettoyage.R")
 
 # Nombre d'accidents par jour pour chaque mois
-lesMois <- c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre')
+lesMois <- factor(levels = c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'))
 nombreDeJoursParMois <- c(31,29,31,30,31,30,31,31,30,31,30,31)
+annees <- c(2019,2018,2017,2016)
 
 ## TMAP ###
 france <- ne_states(country = "France", returnclass = "sf") %>% 
@@ -59,26 +62,42 @@ server <- function(input, output, session) {
     })
     
     # Nombre d'accidents par jour pour chaque mois
-    resultat <- reactive({
+    dfresult <- reactive({
         nombreDannees = 1
-        resultat <- vector()
-        for(i in 1:12){
-            nombreDaccidents <- nrow(filter(carac(), mois==i))
-            nombreDeJoursAuTotal <- nombreDeJoursParMois[i]*nombreDannees
-            # if(i==2){
-            #     nombreDeJoursAuTotal <- nombreDeJoursAuTotal+3 # 2008, 2012, et 2016 sont bisextiles! Donc un jour de plus en fevrier
-            # }
-            x <- nombreDaccidents/nombreDannees
-            resultat <- c(resultat,x)
+        df <- data.frame(row.names = levels(lesMois))
+        for (i in annees){
+            resultat <- c()
+            for(j in 1:12){
+                nombreDaccidents <- nrow(filter(caracteristiques.filtre, an==i, mois==j))
+                nombreDeJoursAuTotal <- nombreDeJoursParMois[j]*nombreDannees
+                if(i==2016){
+                    nombreDeJoursAuTotal <- nombreDeJoursAuTotal+3 # 2008, 2012, et 2016 sont bisextiles! Donc un jour de plus en fevrier
+                }
+                x <- nombreDaccidents/(nombreDannees*nombreDeJoursParMois[j])
+                resultat[j] <- x
+            }
+            df <- cbind(df, i=resultat)
         }
-        for(i in 1:12){
-            resultat[i] <- resultat[i]/nombreDeJoursParMois[i]
-        }
-        resultat
+        colnames(df) <- annees
+        df <- cbind(df, Mois = levels(lesMois))
+        df
     })
     # Rendu 
     output$plot_stats_per_month <- renderPlot({
-        barplot(height=resultat(), names.arg=lesMois,main="Nombre d'accidents par jour pour chaque mois",las=2)
+        # barplot(height=resultat(), names.arg=lesMois,main="Nombre d'accidents par jour pour chaque mois",las=2)
+        dfresult() %>% mutate(Mois = factor(Mois, levels(lesMois))) %>% ggplot(aes(lesMois))  + 
+            geom_point(aes(x=Mois, y=`2016`, group = 1),shape=16, color="blue", size=4) +
+            geom_line(aes(x=Mois, y=`2016`, group = 1), color="blue") +
+            geom_point(aes(x=Mois, y=`2017`, group = 1), shape=16, color="green", size=4) +
+            geom_line(aes(x=Mois, y=`2017`, group = 1), color="green") +
+            geom_point(aes(x=Mois, y=`2018`, group = 1), shape=16, color="orange", size=4) +
+            geom_line(aes(x=Mois, y=`2018`, group = 1), color="orange") +
+            geom_point(aes(x=Mois, y=`2019`, group = 1), shape=16, color="red", size=4) +
+            geom_line(aes(x=Mois, y=`2019`, group = 1), color="red") +
+            theme_xkcd() +
+            labs(x="Mois", y="Nombre d'accidents") +
+            ggtitle("Nombre d'accidents par jour pour chaque mois")
+        
     })
     
     # Analyse par heure
