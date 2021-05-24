@@ -16,11 +16,13 @@ library(rnaturalearth)
 library(rgeos)
 
 # Data Preparation - Nettoyoge
-if(!exists("foo", mode="function")) source("nettoyage.R")
+if(!exists("foo", mode="function")) source("nettoyage.R", encoding = 'UTF-8')
 
 # A réextraire à partir de la population entière.
 Departements <- caracteristiques.2019 %>% select(dep) %>% distinct 
 Criteres <- c("age","gravite")
+Criteres_visu <- c("mean_age","tauxAcc")
+Class_Dage <- gravity %>% select(classeAge) %>% arrange(classeAge) %>% distinct 
 
 mapviewOptions(
     basemaps = c("Esri.WorldShadedRelief", "OpenStreetMap.DE"),
@@ -37,7 +39,7 @@ ui <- dashboardPage(
         sidebarMenu(
             menuItem("Statistiques générales", tabName = "tab_general_statistics", icon = icon("car-crash")),
             menuItem("Comparaison département", tabName = "tab_dep_comparaison", icon = icon("binoculars")),
-            menuItem("Carte", tabName = "tab_map", icon = icon("globe-europe"))
+            menuItem("Carte d'indicateurs", tabName = "tab_map", icon = icon("globe-europe"))
         )
     ), 
     body = dashboardBody(
@@ -72,7 +74,7 @@ ui <- dashboardPage(
                     ),
                     fluidRow(
                         box(
-                            selectInput(inputId = "critere", label = "Critère de comparaison", choices = Criteres)
+                            selectInput(inputId = "crit_comp", label = "Critère de comparaison", choices = Criteres)
                         )
                     ),
                     fluidRow(
@@ -92,16 +94,16 @@ ui <- dashboardPage(
             # Third tab content
             tabItem(tabName = "tab_map", class = "active",
                     fluidRow(
-                        useShinyalert(),
-                        box(
-                            selectizeInput(inputId = "dep_to_compare", options = list(maxItems = 4), label = "Départements (max 4)", choices = Departements),
-                            selectizeInput(inputId = "indicators_to_compare", options = list(maxItems = 5), label = "Indicateurs (max 5)", choices = Departements),
-                            helpText("Note: start typing in to get suggestions.\nTry to break the app by selecting no state or indicator, see what happens :)")
-                        ),
-                        box(
-                            checkboxInput(inputId = "dont_use_facets_for_states", label = "Overlay the time series ?", value = FALSE)
-                        ), 
-                        plotOutput(outputId = "plot_comparison_indicator_between_states")
+                        box(width = 12,
+                            selectInput(inputId = "annee_visu", label = "Année", choices = c(2019,2018,2017,2016)),
+                            selectInput(inputId = "crit_visu", label = "Critère de visualisation", choices = Criteres_visu),
+                            selectInput(inputId = "class_Dage", label = "Classe d'ages ", choices = Class_Dage)
+                        )
+                    ),
+                    fluidRow(
+                        box(width = 12,
+                            mapviewOutput(outputId = "fr_map", width = "100%", height = 750)
+                        )
                     )
             )
         )

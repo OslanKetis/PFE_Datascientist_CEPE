@@ -6,7 +6,6 @@
 #
 
 library(shiny)
-library(shinyalert)
 library(shinydashboard)
 library(DT)
 library(leaflet)
@@ -16,11 +15,10 @@ library(mapview)
 library(rnaturalearth)
 library(tmap)
 library(ggplot2)
-library(extrafont)
 tmap_mode(mode = "view")
 
 
-if(!exists("foo", mode="function")) source("nettoyage.R")
+if(!exists("foo", mode="function")) source("nettoyage.R", encoding = 'UTF-8')
 
 # Nombre d'accidents par jour pour chaque mois
 lesMois <- factor(levels = c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'))
@@ -31,37 +29,16 @@ annees <- c(2019,2018,2017,2016)
 france <- ne_states(country = "France", returnclass = "sf") %>% 
     filter(!name %in% c("Guyane française", "Martinique", "Guadeloupe", "La Réunion", "Mayotte"))
 
-fr_stat <- gravity %>% 
-    group_by(dep) %>% 
-    mutate(mean_age = mean(age, na.rm = TRUE)) %>% 
-    # mutate(mean_secu_or_not = mean(secu_or_not)) %>% 
-    select(mean_age, dep) %>% 
-    slice(1)
-    
-fr_stat <- france %>% 
-    left_join(fr_stat,by=c("iso_3166_2"="dep")) 
-
 
 #Server Logic####
 server <- function(input, output, session) {
     
     # tab "General statistics"
-    # Selection de l'annee selectionnée
-    # carac <- reactiveValues()
-    # observe({
-    #     case_when(input$annee_selected == "2016" ~ (carac$A <- caracteristiques.2016.filtre),
-    #               input$annee_selected == "2017" ~ (carac$A <- caracteristiques.2017.filtre),
-    #               input$annee_selected == "2018" ~ (carac$A <- caracteristiques.2018.filtre),
-    #               input$annee_selected == "2019" ~ (carac$A <- caracteristiques.2019.filtre),
-    #               TRUE ~ caracteristiques.2019.filtre
-    #         )
-    #     })
-    
     carac <- reactive({
         caracteristiques.filtre %>% filter(an == input$annee_selected)
     })
     
-    # Nombre d'accidents par jour pour chaque mois
+    # Nombre d'accidents par jour pour chaque mois - sur toute la période
     dfresult <- reactive({
         nombreDannees = 1
         df <- data.frame(row.names = levels(lesMois))
@@ -94,7 +71,7 @@ server <- function(input, output, session) {
             geom_line(aes(x=Mois, y=`2018`, group = 1), color="orange") +
             geom_point(aes(x=Mois, y=`2019`, group = 1), shape=16, color="red", size=4) +
             geom_line(aes(x=Mois, y=`2019`, group = 1), color="red") +
-            theme_xkcd() +
+            theme_classic() +
             labs(x="Mois", y="Nombre d'accidents") +
             ggtitle("Nombre d'accidents par jour pour chaque mois")
         
@@ -112,32 +89,47 @@ server <- function(input, output, session) {
         barplot(nbParHeures(), main="Nombre d'accidents par heure", xlab="Heure")
     })
     
-    # output$general_statistics_by_dep <- renderDT({})
     
-    output$state_selected_mini_info <- renderValueBox({})
+    # Tab MAP
+    fr_stat_select <- reactive({
+        fr_stat <- gravity %>% 
+            filter(an == input$annee_visu)
+        if ("mean_age" == input$crit_visu) {
+            fr_stat <- fr_stat %>%  
+                group_by(dep) %>% 
+                mutate(mean_age = mean(age, na.rm = TRUE)) %>% 
+                # mutate(mean_secu_or_not = mean(secu_or_not)) %>% 
+                select(mean_age, dep, depFR) %>% 
+                slice(1)
+        }
+        if ("tauxAcc" == input$crit_visu) {
+            fr_stat <- fr_stat %>%  
+                filter(classeAge == input$class_Dage) %>% 
+                group_by(dep) %>% 
+                mutate(tauxAcc = n()*1000/Population) %>% 
+                select(tauxAcc, dep, depFR) %>% 
+                slice(1)
+        }
+        # Jointure avec le shape
+        fr_stat <- france %>% 
+            left_join(fr_stat,by=c("iso_3166_2"="depFR")) 
+        fr_stat
+    })
     
-    check_no_country_or_indicator_selected <- reactive({})
-    
-    observe({})
+    # output$state_selected_mini_info <- renderValueBox({})
+    # 
+    # check_no_country_or_indicator_selected <- reactive({})
+    # 
+    # observe({})
     
     # Debug
     
     # tab "States comparison"
-    # input$state_to_compare_1
-    # input$state_to_compare_2
-    output$plot_comparison_indicator_between_states <- renderPlot({})
+    # output$plot_comparison_indicator_between_states <- renderPlot({})
     
-    # Selection du département à afficher sur la cart
-    caracteristiques.select <- reactive({
-        # caracteristiques.filtre %>% filter(an == input$annee_fr_map) %>% filter(dep == input$dep_fr_map)
-    })
-    
-    # output$fr_map <- renderLeaflet({
-    #     leaflet() %>%
-    #         addTiles() %>%
-    #         addMarkers(lng=(caracteristiques.select())$long, lat=(caracteristiques.select())$lat , popup=(paste0(caracteristiques.select()$Num_Acc)))
-    #         })    
-    
+    # Selection du département à afficher sur la carte
+
+
     output$fr_map_1 <- renderTmap({
         tm_basemap("Stamen.Watercolor") +
             tm_shape(fr_stat) +
@@ -150,16 +142,14 @@ server <- function(input, output, session) {
             tm_shape(fr_stat) +
             tm_fill(col = "mean_age", palette = "Blues", alpha = 0.8) +
             tm_borders("white", lwd = 1)
-    })
+    })   
     
-    # output$fr_map <- renderMapview({
-    #     mapview(fr_stat,
-    #             zcol = "region",
-    #             legend = FALSE,
-    #             layer.name = "Departements",
-    #             popup = leafpop::popupTable(france, zcol = c("name", "region"), feature.id = FALSE, row.numbers = FALSE)
-    #             # popup = leafpop::popupTable(fr_stat, zcol = c("name", "region"), feature.id = FALSE, row.numbers = FALSE)
-    #             )
-    # })
+    output$fr_map <- renderTmap({
+        tm_basemap("Stamen.Watercolor") +
+            tm_shape(fr_stat_select()) +
+            tm_fill(col = input$crit_visu, palette = "Blues", alpha = 0.8) +
+            tm_borders("black", lwd = 1)
+    })
+
     
 }
