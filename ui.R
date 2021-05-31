@@ -14,12 +14,13 @@ library(tidyverse)
 library(mapview)
 library(rnaturalearth)
 library(rgeos)
+library(plotly)
 
 # Data Preparation - Nettoyoge
 if(!exists("foo", mode="function")) source("nettoyage.R", encoding = 'UTF-8')
 
 # A réextraire à partir de la population entière.
-Departements <- caracteristiques.2019 %>% select(dep) %>% distinct 
+Departements <- c(66,75) 
 Criteres <- c("age","gravite")
 Criteres_visu <- c("mean_age","tauxAcc")
 Class_Dage <- gravity %>% select(classeAge) %>% arrange(classeAge) %>% distinct 
@@ -46,19 +47,30 @@ ui <- dashboardPage(
         tabItems(
             # First tab content
             tabItem(tabName = "tab_general_statistics", class = "active",
+                    h2("Statistiques générales"),
+                    div("Les bases de données, extraites du fichier BAAC (Bulletin d'Analyse des Accidents de la Circulation), répertorient l'intégralité des accidents corporels de la circulation routière."),
+                    div("Un accident corporel (mortel et non mortel) de la circulation routière relevé par les forces de l’ordre :",
+                        tags$ul(tags$li("implique au moins une victime"),
+                        tags$li("survient sur une voie publique ou privée, ouverte à la circulation publique"),
+                        tags$li("implique au moins un véhicule"))),
                     fluidRow(
-                        box(width = 6, background = 'blue',
+                        infoBox("Vision mensuelle", icon = icon("calendar-alt"), width = 6),
+                        infoBox("Vision Horaire", icon = icon("hourglass-half"), width = 6),
+                        ),
+                    fluidRow(
+                        box(width = 6,
+                            plotlyOutput("plot_stats_per_month")
+                        ),
+                        box(width = 6,
+                            plotlyOutput("plot_stats_per_hour")
+                        )
+                    ),
+                    fluidRow(
+                        column(width = 6),
+                        box(width = 6, 
                             selectInput(inputId = "annee_selected", label = "Année", choices = c(2019,2018,2017,2016))
                         ),
                         valueBoxOutput(outputId = "annee_selected_mini_info", width = 6)
-                    ),
-                    fluidRow(
-                        box(width = 6,
-                            plotOutput("plot_stats_per_month")
-                        ),
-                        box(width = 6,
-                            plotOutput("plot_stats_per_hour")
-                        )
                     )
             ),
             
@@ -67,26 +79,35 @@ ui <- dashboardPage(
                     fluidRow(
                         box(
                             selectInput(inputId = "dep_selected_1", label = "Département 1", choices = Departements)
-                        ),
-                        box(
-                            selectInput(inputId = "dep_selected_2", label = "Département 2", choices = Departements)
                         )
                     ),
                     fluidRow(
                         box(
-                            selectInput(inputId = "crit_comp", label = "Critère de comparaison", choices = Criteres)
+                            imageOutput("img_age")
+                        ),
+                        box(
+                            imageOutput("img_humidite")
                         )
                     ),
                     fluidRow(
                         box(
-                            # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
-                            # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
-                            mapviewOutput(outputId = "fr_map_1", width = "100%", height = 600)
+                            imageOutput("img_precipitation")
                         ),
                         box(
-                            # selectInput(inputId = "annee_fr_map", label = "Année", choices = c(2016,2017,2018,2019)),
-                            # selectInput(inputId = "dep_fr_map", label = "Département", choices = Departements),
-                            mapviewOutput(outputId = "fr_map_2", width = "100%", height = 600)
+                            imageOutput("img_rafale")
+                        )
+                    ),
+                    fluidRow(
+                        box(
+                            imageOutput("img_temp")
+                        ),
+                        box(
+                            imageOutput("img_var_pression")
+                        )
+                    ),
+                    fluidRow(
+                        box(
+                            imageOutput("img_vit_vent")
                         )
                     )
             ),
@@ -94,14 +115,12 @@ ui <- dashboardPage(
             # Third tab content
             tabItem(tabName = "tab_map", class = "active",
                     fluidRow(
-                        box(width = 12,
+                        box(width = 2,
                             selectInput(inputId = "annee_visu", label = "Année", choices = c(2019,2018,2017,2016)),
                             selectInput(inputId = "crit_visu", label = "Critère de visualisation", choices = Criteres_visu),
                             selectInput(inputId = "class_Dage", label = "Classe d'ages ", choices = Class_Dage)
-                        )
-                    ),
-                    fluidRow(
-                        box(width = 12,
+                        ),
+                        box(width = 10,
                             mapviewOutput(outputId = "fr_map", width = "100%", height = 750)
                         )
                     )

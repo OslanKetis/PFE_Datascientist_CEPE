@@ -15,6 +15,7 @@ library(mapview)
 library(rnaturalearth)
 library(tmap)
 library(ggplot2)
+library(plotly)
 tmap_mode(mode = "view")
 
 
@@ -60,35 +61,130 @@ server <- function(input, output, session) {
         df
     })
     # Rendu 
-    output$plot_stats_per_month <- renderPlot({
-        # barplot(height=resultat(), names.arg=lesMois,main="Nombre d'accidents par jour pour chaque mois",las=2)
-        dfresult() %>% mutate(Mois = factor(Mois, levels(lesMois))) %>% ggplot(aes(lesMois))  + 
-            geom_point(aes(x=Mois, y=`2016`, group = 1),shape=16, color="blue", size=4) +
-            geom_line(aes(x=Mois, y=`2016`, group = 1), color="blue") +
-            geom_point(aes(x=Mois, y=`2017`, group = 1), shape=16, color="green", size=4) +
-            geom_line(aes(x=Mois, y=`2017`, group = 1), color="green") +
-            geom_point(aes(x=Mois, y=`2018`, group = 1), shape=16, color="orange", size=4) +
-            geom_line(aes(x=Mois, y=`2018`, group = 1), color="orange") +
-            geom_point(aes(x=Mois, y=`2019`, group = 1), shape=16, color="red", size=4) +
-            geom_line(aes(x=Mois, y=`2019`, group = 1), color="red") +
-            theme_classic() +
-            labs(x="Mois", y="Nombre d'accidents") +
-            ggtitle("Nombre d'accidents par jour pour chaque mois")
+    output$plot_stats_per_month <- renderPlotly({
+        res <- dfresult() %>% mutate(Mois = factor(Mois, levels(lesMois))) 
+        fig <- plot_ly(
+            type = "scatter",
+            x = res$Mois, 
+            y = res$`2016`,
+            name = '2016',
+            mode = "markers+lines",
+            line = list(color = '#a799b7')) 
+        fig <- fig %>%
+            add_trace(
+                type = "scatter",
+                x = res$Mois, 
+                y = res$`2017`,
+                name = '2017',
+                mode = "markers+lines",
+                line = list(color = '#fdca40')) 
+        fig <- fig %>%
+            add_trace(
+                type = "scatter",
+                x = res$Mois, 
+                y = res$`2018`,
+                name = '2018',
+                mode = "markers+lines",
+                line = list(color = '#fb3640'))  
+        fig <- fig %>%
+            add_trace(
+                type = "scatter",
+                x = res$Mois, 
+                y = res$`2019`,
+                name = '2019',
+                mode = "markers+lines",
+                line = list(color = '#542e71'))  
+        fig <- fig %>% layout(legend = list(orientation = 'v'), title= "Nombre d'accidents par jour pour chaque mois")
+        fig
         
     })
     
     # Analyse par heure
     nbParHeures <- reactive({
             carac() %>% 
-            mutate(hh = str_sub(hrmn, 1, 2)) %>%
-            select(hh) %>%
-            table()
+            mutate(heure = str_sub(hrmn, 1, 2)) %>%
+            group_by(heure) %>% 
+            summarise(nb = n()) 
     })
     # Rendu 
-    output$plot_stats_per_hour <- renderPlot({
-        barplot(nbParHeures(), main="Nombre d'accidents par heure", xlab="Heure")
+    output$plot_stats_per_hour <- renderPlotly({
+        fig2 <- plot_ly( y = nbParHeures()$nb, x = nbParHeures()$heure, type = "bar", orientation = "v")
+        fig2 <- fig2 %>%
+            layout(legend = list(orientation = 'v'), title = "Nombre d'accidents par heure pour une année")
+        fig2
     })
     
+    # PDP
+    # Age
+    output$img_age <- renderImage({
+        # Age
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Age.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_humidite <- renderImage({
+        # Humidite
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Humidite.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_precipitation <- renderImage({
+        # Precipitations
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Precipitations_24H.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_rafale <- renderImage({
+        # Rafale
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Rafale.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_temp <- renderImage({
+        # Temperature
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Temperature.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_var_pression <- renderImage({
+        # Variation précipitations
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_variation_pression.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+
+    }, deleteFile = FALSE)
+    
+    output$img_vit_vent <- renderImage({
+        # Vitesse_vent
+        filename <- normalizePath(file.path('./pdp',
+                                            paste('Dep_', input$dep_selected_1,'_Vitesse_vent.png', sep='')))
+        # Return a list containing the filename and alt text
+        list(src = filename,
+             alt = paste("Image number", input$n))
+        
+    }, deleteFile = FALSE)
     
     # Tab MAP
     fr_stat_select <- reactive({
@@ -116,17 +212,6 @@ server <- function(input, output, session) {
         fr_stat
     })
     
-    # output$state_selected_mini_info <- renderValueBox({})
-    # 
-    # check_no_country_or_indicator_selected <- reactive({})
-    # 
-    # observe({})
-    
-    # Debug
-    
-    # tab "States comparison"
-    # output$plot_comparison_indicator_between_states <- renderPlot({})
-    
     # Selection du département à afficher sur la carte
 
 
@@ -147,7 +232,7 @@ server <- function(input, output, session) {
     output$fr_map <- renderTmap({
         tm_basemap("Stamen.Watercolor") +
             tm_shape(fr_stat_select()) +
-            tm_fill(col = input$crit_visu, palette = "Blues", alpha = 0.8) +
+            tm_fill(col = input$crit_visu, palette = "Blues", alpha = 0.8, id = "name") +
             tm_borders("black", lwd = 1)
     })
 
