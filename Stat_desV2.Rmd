@@ -1,0 +1,409 @@
+---
+title: "Stats descriptives"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Statistiques decriptives basées sur la table Total_2019 créée par le script datamanagement.rmd
+
+```{r librairies}
+library (tidyverse)
+library(readxl)
+library(forcats)
+```
+### import des données
+
+Nous importons les donnnées INSEE de la population afin de créer des taux d'accidents. 
+```{r importDonneesPop}
+# import des données INSEE sur la pop par dep.
+# pour le moment que 2019. A élargir ensuite à tte les valeurs.
+
+
+# definition des plages
+  Plage<-c("C5:W107","X5:AR107","AS5:BM107","A5:A107")
+  Spreadsheet<-c("2019","2019","2019","2019")
+  Genre<-c("Ensemble","Hommes","Femmes","Departement")
+
+  Pop_lst<-map2(.x = Spreadsheet,.y = Plage,~read_xlsx(path = "D:/Users/slauzevis/OneDrive - LISI/Documents/Rstudio/PFE/Data_dowloaded/Population/estim-pop-dep-sexe-aq-1975-2021.xlsx",
+                                                      sheet = .x,
+                                                      range = .y))
+  names(x = Pop_lst)=Genre
+
+  
+# formating des données pour repasser en facteurs 
+  Sexe <- factor(x = c("Tot",1,2),levels = c("Tot",1,2),labels = c("Tot","1","2")) 
+  Dep_levels<-unique(as_vector(Pop_lst$Departement))
+  ClassAge_levels<-c("0 à 4 ans","5 à 9 ans","10 à 14 ans","15 à 19 ans","20 à 24 ans","25 à 29 ans","30 à 34 ans","35 à 39 ans","40 à 44 ans","45 à 49 ans","50 à 54 ans","55 à 59 ans","60 à 64 ans","65 à 69 ans","70 à 74 ans","75 à 79 ans","80 à 84 ans","85 à 89 ans","90 à 94 ans","95 ans et plus")
+
+# boucle pour repasser des listes en 1 seul tibble
+  Departements<-factor(pluck(.x = Pop_lst,"Departement","...1"),levels = Dep_levels)
+  Pop_tbl<- tibble()
+  rslt<-tibble()
+  for (i in 1:3){
+    rslt<-tibble(Pop_lst[[i]])%>%
+    add_column("dep"= Departements,
+               "sexe" = Sexe[i])
+    Pop_tbl<-bind_rows(Pop_tbl,rslt)
+  }
+
+# supprime les lignes france metropolitaine & colonne totale
+  Pop_tbl<-Pop_tbl%>%filter(!dep%in%"France métropolitaine")%>%select(-Total)  
+
+#reshape Data via pivot_longer.
+  Pop_tbl<-Pop_tbl%>%pivot_longer(cols = 1:20,names_to = "ClasseAge",values_to = "Population")
+  Pop_tbl<-Pop_tbl%>%mutate("ClasseAge"=factor(x = ClasseAge,levels = ClassAge_levels))
+  
+# release of variable
+  rm(rslt)  
+  
+  rm(i)
+  rm(Plage)
+  rm(Spreadsheet)
+  rm(Genre)
+  
+```
+
+```{r  import des donnees brutes accidents CARACTERISTIQUE}
+# import des donnnées Accidents "caracteristiques" de 2014 à 2019
+Fichier <-paste0("D:/Users/slauzevis/OneDrive - LISI/Documents/Rstudio/PFE/Data_dowloaded/Caracteristiques/caracteristiques_",rep(2014:2019),".csv")
+
+Type_col_cara<-cols(
+  Num_Acc=col_double(),
+  an=col_factor(),
+  mois=col_factor(),
+  jour=col_factor(), 
+  hrmn=col_guess(),
+  lum=col_factor(),
+  agg=col_factor(),
+  int=col_factor(),
+  atm=col_factor(),
+  col=col_factor(),
+  com=col_double(),
+#  adr=col_character(),
+  gps=col_character(),
+  lat=col_character(),
+  long=col_character(),
+  dep=col_character())
+
+# juste 2019 pour le moment
+Cara_tbl<-as_tibble(read_csv2(file = "D:/Users/slauzevis/OneDrive - LISI/Documents/Rstudio/PFE/Data_dowloaded/Caracteristiques/caracteristiques_2019.csv",
+                    col_types = Type_col_cara)) 
+
+# ébauche pr 2014 à 2019  A FINIR
+#  Cara_lst<-map(.x = Fichier,.f=~read_csv2(file =.x,col_types = Type_col))
+#names(Cara_lst)=rep(2014:2019)                    
+
+# reformating des données - passage en facteur
+  refor<-function(val){
+    if (str_length(val)==1) { 
+      refor<-paste0("0",val)
+    }else{refor<-val}
+  }
+  Cara_tbl<-Cara_tbl%>%mutate("dep"=map_chr(.x = dep,~refor(val = .x)))
+  Cara_tbl<-Cara_tbl%>%mutate("dep"=factor(x = dep,levels = Dep_levels))
+  Cara_tbl <-Cara_tbl%>%filter(!is.na(dep)) # suppression des DOM
+ # rst<-as.data.frame(table(Cara_tbl$dep))
+#  sum(rst$Freq)
+  
+# released of variable
+  rm(Type_col_cara)
+  rm(Fichier)
+```
+
+
+```{r import des donnees brutes accidents USAGER}
+# import des fichiers Usagers 
+
+Type_col_usagers<-cols(
+              Num_Acc=col_double(),
+              id_vehicule=col_factor(),
+              num_veh=col_character(),
+              place=col_factor(),
+              catu=col_factor(),
+              grav=col_factor(),
+              sexe=col_factor(),
+              an_nais=col_double(),
+              trajet=col_factor(),
+              secu1=col_factor(),
+              secu2=col_factor(),
+              secu3=col_factor(),
+              locp=col_factor(),
+              actp=col_factor(),
+              etatp=col_factor())
+
+# juste 2019 pour le moment
+Usagers_tbl<-as_tibble(read_csv2(file = "D:/Users/slauzevis/OneDrive - LISI/Documents/Rstudio/PFE/Data_dowloaded/Usagers/usagers-2019.csv",
+                    col_types = Type_col_usagers)) 
+
+# reformat des données
+  Usagers_tbl<-Usagers_tbl%>%mutate("sexe"=factor(x = sexe,levels = Sexe))
+  rsl_usa<-as.data.frame(table(Usagers_tbl$sexe))
+  sum(rsl_usa$Freq)
+
+# released of variable
+ rm(Type_col_cara)
+
+```
+
+
+### Traitements préliminaire aux Statistiques descriptives.
+
+Les fichiers individuels sont maintenant chargés en mémoire. Nous allons les fusionner. 
+```{r Fusion tables Usagers et Caractéristique}
+Table_Tot <- inner_join(x = Usagers_tbl,y = Cara_tbl,by="Num_Acc")
+
+#Table_Tot%>%select(dep)%>%summarise("tot"=n(),
+                                    "withna"= sum(is.na(dep)),
+                                    "withoNA"=sum(!is.na(dep)))
+```
+
+Ensuite nous allons rajouter des classes d'ages aux accidents de façon à pouvoir les comparer à la population Française. 
+
+```{r rajout Classe age dans Accident}
+
+Table_Tot<-Table_Tot%>%mutate("Age"=2021-an_nais)
+Table_Tot<-Table_Tot%>%mutate("ClasseAge"=cut(Table_Tot$Age,breaks = c(0,4,9,14,19,24,29,34,39,44,49,54,59,64,69,74,79,84,89,94,95),labels = ClassAge_levels))
+
+Table_Tot%>%group_by(ClasseAge)%>%summarise(NbAccidentsEnsemble=n())
+
+```
+
+
+```{r analyse classe age avec NA}
+# analyse des donnnées NA sur les classes d'ages.
+    Table_Tot%>%filter(is.na(ClasseAge)==TRUE)%>%summarise(AgeMoyen=mean(Age),
+                                                            AgeStdev=sd(Age),
+                                                            AgeMin=min(Age),
+                                                            AgeMax=max(Age),
+                                                            Nb=n()                                                       )
+
+```
+
+```{r On batit le tibble pr les stats des}
+
+# genere le nb d'accidents par depart & sexe
+  Syn_Acci_tbl<-Table_Tot%>%
+                  group_by(dep,sexe,ClasseAge)%>%
+                  summarise("NbAccidents"=n())
+
+# fusion des 2 tables à savoir Accidents+caracteristiques et population
+  StatDesc<-full_join(x =Syn_Acci_tbl,y =Pop_tbl ,by=c("dep","sexe","ClasseAge"))
+
+# Presentation des résultats
+  StatDesc<- StatDesc%>%filter(sexe!="Tot")
+  
+```
+
+###  PARTIE STAT DESCRIPTIVES  sur taux accident
+```{r function TauxVersusPop}
+#  renvoie un tableau du type par "BY" taux de KPI/Population. 
+# ligne => by
+#  colonnes => taux
+
+TauxVsPop <-function( df=df, kpi=kpi, By=By){
+  TauxVsPop<- {{df}}%>%
+                group_by({{By}})%>%
+                summarise( "NB"=sum({{kpi}},na.rm = TRUE),
+                          "NbPop"=sum(Population,na.rm = TRUE))%>%
+                mutate("Proportion"=NB/NbPop)%>%
+                arrange(Proportion)
+    return (TauxVsPop)
+}
+
+rsl<-TauxVsPop(df=StatDesc,kpi = NbAccidents,By = dep)
+
+```
+
+
+#Taux Accidents / departement
+
+Le Pvalue confirme un impact département sur letaux moyen
+```{r Grah & analyse par départements}
+
+# Proportion taux accident par dep
+rsl<-TauxVsPop(df=StatDesc,kpi= NbAccidents,By = dep)
+rsl<-rsl%>%arrange(Proportion)
+plot(rsl$Proportion)
+
+rsl.prop.test<-prop.test(x = rsl$NB,n = rsl$NbPop,alternative = "two.side")
+rsl.prop.test$p.value
+```
+
+#Taux d'accident par classe Age
+
+```{r taux proportion classe age}
+StatDesc2<-StatDesc%>%filter(!is.na(ClasseAge))
+rsl<-TauxVsPop(df=StatDesc2,kpi = NbAccidents,By = ClasseAge)
+plot( Proportion~ClasseAge,data=rsl)
+rsl.prop.test<-prop.test(x = rsl$NB,n = rsl$NbPop,alternative = "two.side")
+rsl.prop.test$p.value
+rsl.prop.test
+
+```
+
+# taux d'accident par Sexe
+
+```{r TauxAccident versus Sexe}
+rsl<- TauxVsPop(df=StatDesc,kpi = NbAccidents,By = sexe)
+plot( Proportion~sexe,data=rsl)
+rsl.prop.test<-prop.test(x = rsl$NB,n = rsl$NbPop,alternative = "two.side")
+rsl.prop.test$p.value
+rsl.prop.test
+```
+
+### stat Descriptives par Gravité
+On batit le tibble pr les stats des
+```{r tibble stat des taux gravite}
+Table_Tot<-Table_Tot%>%mutate(grav=as.character(grav))%>%
+                      mutate(grav=as.numeric(grav))
+
+# genere le nb d'accidents par depart & sexe
+  Syn_Acci_tbl<-Table_Tot%>%
+                  group_by(dep,sexe,ClasseAge)%>%
+                  summarise("GraviteMoy"=mean(grav))
+
+# fusion des 2 tables à savoir Accidents+caracteristiques et population
+  StatDesc<-full_join(x =Syn_Acci_tbl,y =Pop_tbl ,by=c("dep","sexe","ClasseAge"))
+
+# Presentation des résultats
+  StatDesc<- StatDesc%>%filter(sexe!="Tot")
+  StatDesc<-StatDesc%>%ungroup
+
+```
+
+
+# gravite moyenne par departement
+
+```{r}
+# Gravité par dep
+StatDesc<-StatDesc%>%ungroup
+
+rsl<-StatDesc%>%select(dep,GraviteMoy)%>%
+      filter(!is.na(GraviteMoy))%>%
+      group_by(dep)%>%
+      summarize(GraviteMoy=mean(GraviteMoy))
+rsl<-rsl%>%arrange(desc(GraviteMoy))
+plot(rsl$GraviteMoy)
+
+```
+
+
+```{r gravité moyenne par classe age}
+rsl<-StatDesc%>%select(ClasseAge,GraviteMoy)%>%
+      filter(!is.na(GraviteMoy))%>%
+      group_by(ClasseAge)%>%
+      summarize(GraviteMoy=mean(GraviteMoy))
+rsl<-rsl%>%arrange(desc(GraviteMoy))
+plot(rsl)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##### Archives
+Nous avons une difference de taux d'accident en fonction des départements.
+
+```{r graph classe age}
+# prop accident par classe age
+  rsl<-StatDesc%>%group_by(ClasseAge)%>% summarise("NbAccidents"= sum(NbAccidents,na.rm = TRUE),
+                                              "Pop"=sum(Population,na.rm = TRUE))%>%
+                                         mutate("ProportionAccident"=NbAccidents/Pop)%>%
+                                        arrange(ProportionAccident)
+
+  plot(ProportionAccident~ClasseAge,data=rsl)
+```
+L'experience / profil utilisateur semble être un facteur important sur le taux d'accident.
+Notons la tranche 40 - 50ans ( expérimenté donc) qui reste plus haute que les >50 ans. 
+
+
+```{r pour 1 classe age la proportion par dep}
+rsl<- StatDesc%>%filter(ClasseAge=="30 à 34 ans")
+
+rsl<-  rsl%>%group_by(dep)%>%summarise( "NBAccidents"=sum(NbAccidents,na.rm = TRUE),
+                                        "NbPop"=sum(Population,na.rm = TRUE))%>%
+                                  mutate("ProportionAccident"=NBAccidents/NbPop)%>%
+                                  arrange(ProportionAccident)
+    plot(ProportionAccident~NbPop,data = rsl)
+    plot(ProportionAccident~dep,data=rsl)
+```
+
+POur une même classe d'age nous avons des variabilité différentes.
+
+
+
+
+
+
+
+
+```{r NbAccidentPerDep}
+total_19%>%group_by(dep)%>%tally()%>%arrange(desc(n))
+table(total_19$dep,total_19$sexe)
+
+total_19%>%group_by(dep)%>% summarise(NbAccidents = n(),
+                                      PercentageHommes =sum(sexe%in%1)/n(),
+                                      PercentageFemmes= sum(sexe%in%2)/n())%>%
+                            arrange(desc(NbAccidents))
+                           
+
+```
+
+```{r NbAccidendsParMois& Jour}
+
+total_19%>%group_by(mois)%>%summarise(NbAccidents = n())%>%
+          ungroup()%>%
+          mutate(Percentage= NbAccidents/sum(NbAccidents))
+                 
+total_19%>%group_by(jour)%>%summarise(NbAccidents = n())%>%
+          ungroup()%>%
+          mutate(Percentage= NbAccidents/sum(NbAccidents))     
+
+
+```
+
+
+
+```{r  Categorie de route}
+total_19<-total_19%>%mutate(catr=factor(catr,levels=c(1:9),labels=c("Autoroute",
+                                                                      "Route nationale",
+                                                                      "Route Départementale",
+                                                                      "Voie Communales",
+                                                                      "Hors réseau public",
+                                                                      "Parc de stationnement ouvert à la circulation publique",
+                                                                      "Routes de métropole urbaine",
+                                                                      "Non Spécifié",
+                                                                      "autre")))
+                                                                      
+
+total_19%>%group_by(catr)%>%summarise(NbAccidents = n())%>%
+            ungroup()%>%
+          mutate(Percentage = NbAccidents/sum(NbAccidents))
+```
+  
+
+
+
