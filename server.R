@@ -195,15 +195,40 @@ server <- function(input, output, session) {
                 group_by(dep) %>% 
                 mutate(mean_age = mean(age, na.rm = TRUE)) %>% 
                 # mutate(mean_secu_or_not = mean(secu_or_not)) %>% 
-                select(mean_age, dep, depFR) %>% 
+                select(mean_age, Total, dep, depFR) %>% 
                 slice(1)
         }
         if ("tauxAcc" == input$crit_visu) {
             fr_stat <- fr_stat %>%  
+                # filter(classeAge == input$class_Dage) %>% 
+                group_by(dep) %>% 
+                mutate(tauxAcc = n()*1000/Total) %>% 
+                select(tauxAcc, Total, dep, depFR) %>% 
+                slice(1)
+        }
+        if ("tauxAccClasseAge" == input$crit_visu) {
+            fr_stat <- fr_stat %>%  
                 filter(classeAge == input$class_Dage) %>% 
                 group_by(dep) %>% 
-                mutate(tauxAcc = n()*1000/Population) %>% 
-                select(tauxAcc, dep, depFR) %>% 
+                mutate(tauxAccClasseAge = n()*1000/Population_ClassseAge) %>% 
+                select(tauxAccClasseAge, Total, Population_ClassseAge, dep, depFR) %>% 
+                slice(1)
+        }
+        if ("tauxGrav" == input$crit_visu) {
+            fr_stat <- fr_stat %>%
+                group_by(dep) %>% 
+                mutate(tauxGrav = mean(as.numeric(grav_or_not))) %>% 
+                # filter(!is.na(tauxGrav))%>%
+                # mutate(tauxGrav = mean(tauxGrav)) %>% 
+                select(tauxGrav, Total, dep, depFR) %>% 
+                slice(1)
+        }
+        if ("tauxGravClasseAge" == input$crit_visu) {
+            fr_stat <- fr_stat %>%
+                filter(classeAge == input$class_Dage) %>% 
+                group_by(dep) %>% 
+                mutate(tauxGravClasseAge = mean(as.numeric(grav_or_not))) %>% 
+                select(tauxGravClasseAge, Total, dep, depFR) %>% 
                 slice(1)
         }
         # Jointure avec le shape
@@ -213,26 +238,30 @@ server <- function(input, output, session) {
     })
     
     # Selection du département à afficher sur la carte
+    # Source: https://stackoverflow.com/questions/54356383/how-to-fix-label-when-i-hover-mouse-over-map-made-with-tmap
 
 
-    output$fr_map_1 <- renderTmap({
-        tm_basemap("Stamen.Watercolor") +
-            tm_shape(fr_stat) +
-            tm_fill(col = "mean_age", palette = "Blues", alpha = 0.8) +
-            tm_borders("white", lwd = 1)
-    })   
-    
-    output$fr_map_2 <- renderTmap({
-        tm_basemap("Stamen.Watercolor") +
-            tm_shape(fr_stat) +
-            tm_fill(col = "mean_age", palette = "Blues", alpha = 0.8) +
-            tm_borders("white", lwd = 1)
-    })   
+    # output$fr_map_1 <- renderTmap({
+    #     tm_basemap("Stamen.Watercolor") +
+    #         tm_shape(fr_stat) +
+    #         tm_fill(col = "mean_age", palette = "Blues", alpha = 0.8) +
+    #         tm_borders("white", lwd = 1)
+    # })   
+    # 
+    # output$fr_map_2 <- renderTmap({
+    #     tm_basemap("Stamen.Watercolor") +
+    #         tm_shape(fr_stat) +
+    #         tm_fill(col = "mean_age", palette = "Blues", alpha = 0.8) +
+    #         tm_borders("white", lwd = 1)
+    # })   
     
     output$fr_map <- renderTmap({
         tm_basemap("Stamen.Watercolor") +
             tm_shape(fr_stat_select()) +
-            tm_fill(col = input$crit_visu, palette = "Blues", alpha = 0.8, id = "name") +
+            tm_fill(col = input$crit_visu, palette = "Blues",
+                    alpha = 0.8, id = "name",
+                    popup.vars = c("Population département : " = "Total",
+                                "Critère : " = input$crit_visu)) +
             tm_borders("black", lwd = 1)
     })
 

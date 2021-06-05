@@ -183,8 +183,10 @@ for (i in 1:3){
   Pop_tbl <- bind_rows(Pop_tbl, rslt)
 }
 #reshape Data via pivot_longer.
-Pop_tbl<-Pop_tbl%>%pivot_longer(cols = 1:20,names_to = "ClasseAge",values_to = "Population")
-Pop_tbl<-Pop_tbl%>%mutate("ClasseAge"=factor(x = ClasseAge,levels = ClassAge_levels))
+Pop_tbl <- Pop_tbl%>%pivot_longer(cols = 1:20,names_to = "ClasseAge",values_to = "Population_ClassseAge")
+Pop_tbl <- Pop_tbl%>%mutate("ClasseAge"=factor(x = ClasseAge,levels = ClassAge_levels))
+Pop_tbl <- Pop_tbl%>%filter(sexe == "Tot") %>% select(-sexe)
+
 # release of variable
 rm(rslt)  
 rm(i)
@@ -201,8 +203,8 @@ filtrage_gravite <- function(tbl1, annee) {
     # filter(!is.na(grav)) %>%
     mutate(grav_or_not = 
              case_when(
-               grav == "2" | grav == "3" ~ "1",
-               TRUE ~ "2"
+               grav == "2" | grav == "3" ~ "2",
+               TRUE ~ "1"
              )
     ) %>% 
     mutate(age = annee-an_nais) %>% 
@@ -214,8 +216,8 @@ filtrage_gravite <- function(tbl1, annee) {
       depFR = paste0('FR-', dep)
     ) %>%
     mutate(classeAge = cut(age,breaks = ClasseDage, labels = ClassAge_levels)) %>% 
-    select(an, grav_or_not, sexe, age, classeAge, trajet, lat, long, dep, depFR) %>% 
-    inner_join(Pop_tbl, by=c("dep"="dep", "sexe" = "sexe", "classeAge" = "ClasseAge" ))
+    select(an, grav, grav_or_not, sexe, age, classeAge, trajet, lat, long, dep, depFR) %>% 
+    inner_join(Pop_tbl, by=c("dep"="dep", "classeAge" = "ClasseAge" ))
 }
 
 gravity_16 <- filtrage_gravite(total_16,2016)

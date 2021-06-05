@@ -4,6 +4,9 @@
 #       - Car accident distribution
 #       - Region 
 #
+# Sources:
+#   https://shiny.rstudio.com/articles/tag-glossary.html
+#   https://stackoverflow.com/questions/27982577/how-to-set-a-conditional-panel-to-a-selectinput-in-shiny
 
 library(shiny)
 library(shinyalert)
@@ -22,7 +25,7 @@ if(!exists("foo", mode="function")) source("nettoyage.R", encoding = 'UTF-8')
 # A réextraire à partir de la population entière.
 Departements <- c(66,75) 
 Criteres <- c("age","gravite")
-Criteres_visu <- c("mean_age","tauxAcc")
+Criteres_visu <- c("mean_age","tauxAcc","tauxAccClasseAge", "tauxGrav","tauxGravClasseAge")
 Class_Dage <- gravity %>% select(classeAge) %>% arrange(classeAge) %>% distinct 
 
 mapviewOptions(
@@ -118,7 +121,17 @@ ui <- dashboardPage(
                         box(width = 2,
                             selectInput(inputId = "annee_visu", label = "Année", choices = c(2019,2018,2017,2016)),
                             selectInput(inputId = "crit_visu", label = "Critère de visualisation", choices = Criteres_visu),
-                            selectInput(inputId = "class_Dage", label = "Classe d'ages ", choices = Class_Dage)
+                            conditionalPanel(
+                                condition = "input.crit_visu === 'tauxAccClasseAge' || input.crit_visu === 'tauxGravClasseAge'",
+                                selectInput(inputId = "class_Dage", label = "Classe d'ages ", choices = Class_Dage)),
+                            h2("Critères"),
+                            div("",
+                                tags$ul(tags$li("Mean age: L'age moyen par département"),
+                                        tags$li("tauxAcc: Taux d'accident corporel par département (1/1000)"),
+                                        tags$li("tauxAccClasseAge: Taux d'accident corporel par département et par classe d'age (1/1000)"),
+                                        tags$li("tauxGrav: Taux de gravité moyen des accidents corporel par département"),
+                                        tags$li("tauxGravClasseAge: Taux de gravité moyen des accidents corporel par département et par classe d'age")
+                                        )),
                         ),
                         box(width = 10,
                             mapviewOutput(outputId = "fr_map", width = "100%", height = 750)
