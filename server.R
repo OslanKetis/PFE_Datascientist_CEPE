@@ -115,76 +115,99 @@ server <- function(input, output, session) {
     })
     
     # PDP
-    # Age
-    output$img_age <- renderImage({
-        # Age
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Age.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
+    prediction.62.select <- reactive({
+        prediction.62 %>% mutate(var_selected = input$var_selected)
+    })
+    prediction.44.select <- reactive({ 
+        prediction.44 %>% mutate(var_selected = input$var_selected)
+    })
     
-    output$img_humidite <- renderImage({
-        # Humidite
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Humidite.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
+    # variable continue découpée en classe: Humidite, Temperature, Rafales, rosee(optionnel), Precipitations_24H (plus d'effet pour 62 que 44)
+    class.44 <- reactive({
+        case_when(
+            input$var_selected == "Humidite" ~ cut(prediction.44$Humidite, breaks = 5),
+            input$var_selected == "Temperature" ~ cut(prediction.44$Temperature, breaks = 5),
+            input$var_selected == "Rafales" ~ cut(prediction.44$Rafales, breaks = 5),
+            input$var_selected == "rosee" ~ cut(prediction.44$rosee, breaks = 5),
+            input$var_selected == "Precipitations_24H" ~ cut(prediction.44$Precipitations_24H, breaks = 5),
+        )
+    })
     
-    output$img_precipitation <- renderImage({
-        # Precipitations
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Precipitations_24H.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
-    
-    output$img_rafale <- renderImage({
-        # Rafale
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Rafale.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
-    
-    output$img_temp <- renderImage({
-        # Temperature
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Temperature.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
-    
-    output$img_var_pression <- renderImage({
-        # Variation précipitations
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_variation_pression.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
-
-    }, deleteFile = FALSE)
-    
-    output$img_vit_vent <- renderImage({
-        # Vitesse_vent
-        filename <- normalizePath(file.path('./pdp',
-                                            paste('Dep_', input$dep_selected_1,'_Vitesse_vent.png', sep='')))
-        # Return a list containing the filename and alt text
-        list(src = filename,
-             alt = paste("Image number", input$n))
         
-    }, deleteFile = FALSE)
+    output$plot_pdp_box_62 <- renderPlotly({
+        fig3 <- plot_ly(y = prediction.62$pred,
+                        x = prediction.62[[input$var_selected, exact=FALSE]],
+                        color = prediction.62[[input$var_selected, exact=FALSE]],
+                        type = "box", orientation = "v")
+        fig3 <- fig3 %>%
+            layout(legend = list(orientation = 'v'),
+                   title = "Partial Dependence Plot - Département 62", 
+                   yaxis = list(title = 'Probability of serious injury or death',
+                                range = c(0,1)))
+        fig3
+    })
+    output$plot_pdp_box_44 <- renderPlotly({
+        fig3 <- plot_ly(y = prediction.44$pred,
+                        x = prediction.44[[input$var_selected, exact=FALSE]],
+                        color = prediction.44[[input$var_selected, exact=FALSE]],
+                        type = "box", orientation = "v")
+        fig3 <- fig3 %>%
+            layout(legend = list(orientation = 'v'),
+                   title = "Partial Dependence Plot - Département 44", 
+                   yaxis = list(title = 'Probability of serious injury or death',
+                                range = c(0,1)))
+        fig3
+    })
+    
+    # A faire en plotly
+    output$plot_pdp_grad_62 <- renderPlotly({
+        # p <- ggplot(data = prediction.62) +
+        #     aes(x= case_when(input$var_selected == "mois" ~ mois,
+        #               input$var_selected == "Vitesse_vent" ~ Vitesse_vent,
+        #               input$var_selected == "Temperature" ~ Temperature,
+        #               input$var_selected == "Humidite" ~ Humidite,
+        #               input$var_selected == "Variation_pression" ~ Variation_pression,
+        #               input$var_selected == "Rafales" ~ Rafales,
+        #               input$var_selected == "rosee" ~ rosee,
+        #               input$var_selected == "Precipitations_24H" ~ Precipitations_24H,
+        #               TRUE ~ lum), y = pred) +
+        #     geom_point() + geom_smooth() + 
+        #     ylim(0, 1)
+        # fig <- ggplotly(p)
+        # fig
+        fig4 <- plot_ly(y = prediction.62$pred,
+                        x = prediction.62[[input$var_selected, exact=FALSE]],
+                        color = prediction.62[[input$var_selected, exact=FALSE]],
+                        type = "scatter", orientation = "v")
+        fig4 <- fig4 %>%
+            layout(legend = list(orientation = 'v'),
+                   title = "Partial Dependence Plot - Département 62", 
+                   yaxis = list(title = 'Probability of serious injury or death',
+                                range = c(0,1)))
+        fig4
+    })
+    output$plot_pdp_grad_44 <- renderPlotly({
+        fig4 <- plot_ly(y = prediction.44$pred,
+                        x = prediction.44[[input$var_selected, exact=FALSE]],
+                        color = prediction.44[[input$var_selected, exact=FALSE]],
+                        type = "scatter", orientation = "v")
+        fig4 <- fig4 %>%
+            layout(legend = list(orientation = 'v'),
+                   title = "Partial Dependence Plot - Département 44", 
+                   yaxis = list(title = 'Probability of serious injury or death',
+                                range = c(0,1)))
+        fig4
+    })
+    
+    # output$img_vit_vent <- renderImage({
+    #     # Vitesse_vent
+    #     filename <- normalizePath(file.path('./pdp',
+    #                                         paste('Dep_', input$dep_selected_1,'_Vitesse_vent.png', sep='')))
+    #     # Return a list containing the filename and alt text
+    #     list(src = filename,
+    #          alt = paste("Image number", input$n))
+    #     
+    # }, deleteFile = FALSE)
     
     # Tab MAP
     fr_stat_select <- reactive({

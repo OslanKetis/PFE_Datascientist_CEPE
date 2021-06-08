@@ -27,6 +27,7 @@ Departements <- c(66,75)
 Criteres <- c("age","gravite")
 Criteres_visu <- c("mean_age","tauxAcc","tauxAccClasseAge", "tauxGrav","tauxGravClasseAge")
 Class_Dage <- gravity %>% select(classeAge) %>% arrange(classeAge) %>% distinct 
+var_pdp <- names(select(prediction, -id,-pred))
 
 mapviewOptions(
     basemaps = c("Esri.WorldShadedRelief", "OpenStreetMap.DE"),
@@ -42,7 +43,7 @@ ui <- dashboardPage(
     sidebar = dashboardSidebar(
         sidebarMenu(
             menuItem("Statistiques générales", tabName = "tab_general_statistics", icon = icon("car-crash")),
-            menuItem("Comparaison département", tabName = "tab_dep_comparaison", icon = icon("binoculars")),
+            menuItem("Comparaison départements (PDP)", tabName = "tab_dep_comparaison", icon = icon("binoculars")),
             menuItem("Carte d'indicateurs", tabName = "tab_map", icon = icon("globe-europe"))
         )
     ), 
@@ -80,37 +81,30 @@ ui <- dashboardPage(
             # Second tab content
             tabItem(tabName = 'tab_dep_comparaison', class = "active",
                     fluidRow(
-                        box(
-                            selectInput(inputId = "dep_selected_1", label = "Département 1", choices = Departements)
-                        )
+                        infoBox("Département 62", icon = icon("mountain"), width = 6),
+                        infoBox("Département 44", icon = icon("wind"), width = 6),
                     ),
                     fluidRow(
-                        box(
-                            imageOutput("img_age")
+                        column(width = 3),
+                        box(width = 6, 
+                            selectInput(inputId = "var_selected", label = "Variable", choices = var_pdp)
                         ),
-                        box(
-                            imageOutput("img_humidite")
-                        )
+                        column(width = 3)
                     ),
                     fluidRow(
-                        box(
-                            imageOutput("img_precipitation")
+                        box(width = 6,
+                            plotlyOutput("plot_pdp_box_62")
                         ),
-                        box(
-                            imageOutput("img_rafale")
+                        box(width = 6,
+                            plotlyOutput("plot_pdp_box_44")
                         )
                     ),
                     fluidRow(
-                        box(
-                            imageOutput("img_temp")
+                        box(width = 6,
+                            plotlyOutput("plot_pdp_grad_62")
                         ),
-                        box(
-                            imageOutput("img_var_pression")
-                        )
-                    ),
-                    fluidRow(
-                        box(
-                            imageOutput("img_vit_vent")
+                        box(width = 6,
+                            plotlyOutput("plot_pdp_grad_44")
                         )
                     )
             ),

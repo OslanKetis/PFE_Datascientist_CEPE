@@ -226,3 +226,28 @@ gravity_18 <- filtrage_gravite(total_18,2018)
 gravity_19 <- filtrage_gravite(total_19,2019)
 
 gravity <- bind_rows(gravity_16, gravity_17, gravity_18, gravity_19)
+
+# PDP  ####
+prediction <- read.table("pdp/keras_prediction_All.csv", stringsAsFactors = T)
+# prediction %>% group_by(dep) %>% summarise(grave=sum(grav_or_not), n=n()) %>% mutate(taux =grave/n ) %>% arrange(-taux)
+
+prediction.44 <- read.table("pdp/keras_prediction_66_44.csv", stringsAsFactors = T)
+# prediction.44 %>% filter(pred>0.5)
+
+prediction.62 <- read.table("pdp/keras_prediction_62.csv", stringsAsFactors = T)
+# prediction.62 %>% filter(pred>0.5)
+
+prediction.62 <- prediction.62 %>% mutate_at(vars(-("id"),-("Vitesse_vent"), -("Temperature"), -("Humidite"),-("Variation_pression"),-("Rafales"),-("rosee"),-("Precipitations_24H") ,-("age"),-("pred")),as.factor)
+prediction.44 <- prediction.44 %>% mutate_at(vars(-("id"),-("Vitesse_vent"), -("Temperature"), -("Humidite"),-("Variation_pression"),-("Rafales"),-("rosee"),-("Precipitations_24H") ,-("age"),-("pred")),as.factor)
+
+levels(prediction.44$trajet)<- c("Domicile – travail", "Domicile – école", "Courses – achats", "professionnelle", "loisir", "Inconnu")
+levels(prediction.62$trajet)<- c("Domicile – travail", "Domicile – école", "Courses – achats", "professionnelle", "loisir", "Inconnu")
+
+levels(prediction.44$mois) <- c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre')
+levels(prediction.62$mois) <- c('Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre')
+
+levels(prediction.44$place) <- c('Devant', 'Milieu', 'Derriere')
+levels(prediction.62$place) <- c('Devant', 'Milieu', 'Derriere')
+
+levels(prediction.44$lum) <- c('Plein jour', 'Crépuscule ou aube', 'Nuit sans éclairage')
+levels(prediction.62$lum) <- c('Plein jour', 'Crépuscule ou aube', 'Nuit sans éclairage')
